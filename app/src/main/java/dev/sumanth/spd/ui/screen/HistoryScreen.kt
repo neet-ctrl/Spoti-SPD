@@ -215,7 +215,7 @@ fun HistoryScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                         )
                                     }
                                     LinearProgressIndicator(
-                                        progress = { item.getSuccessRate().toFloat() / 100f },
+                                        progress = item.getSuccessRate().toFloat() / 100f,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(6.dp)

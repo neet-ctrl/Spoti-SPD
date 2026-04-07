@@ -1,8 +1,10 @@
 package dev.sumanth.spd.ui.component
 
+import android.net.Uri
 import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +63,22 @@ fun SpotifyDialog(viewModel: HomeScreenViewModel) {
                             settings.loadWithOverviewMode = true
                             settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
                             webViewClient = object : WebViewClient() {
+                                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                    val url = request?.url?.toString() ?: return false
+                                    if (url.startsWith("intent://")) {
+                                        extractFallbackUrl(url)?.let { fallback ->
+                                            view?.loadUrl(fallback)
+                                            return true
+                                        }
+                                    }
+                                    if (url.startsWith("spotify:")) {
+                                        val fallback = convertSpotifyUri(url)
+                                        view?.loadUrl(fallback)
+                                        return true
+                                    }
+                                    return false
+                                }
+
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     super.onPageFinished(view, url)
                                     Log.d("Scraper", "Page finished loading: $url")
@@ -92,4 +110,14 @@ fun SpotifyDialog(viewModel: HomeScreenViewModel) {
             }
         }
     }
+}
+
+private fun extractFallbackUrl(intentUrl: String): String? {
+    val fallbackMatch = Regex("S\\.browser_fallback_url=([^;]+)").find(intentUrl)?.groups?.get(1)?.value
+    return fallbackMatch?.let { Uri.decode(it) }
+}
+
+private fun convertSpotifyUri(spotifyUri: String): String {
+    val path = spotifyUri.removePrefix("spotify:").replace(":", "/")
+    return "https://open.spotify.com/$path"
 }

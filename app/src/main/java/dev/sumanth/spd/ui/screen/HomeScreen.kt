@@ -43,7 +43,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -324,11 +323,10 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 LinearProgressIndicator(
-                                    progress = { viewModel.fileProgress },
+                                    progress = viewModel.fileProgress,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(6.dp),
-                                    strokeCap = StrokeCap.Round,
                                     color = MaterialTheme.colorScheme.secondary,
                                     trackColor = MaterialTheme.colorScheme.secondaryContainer
                                 )
@@ -360,11 +358,10 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                 )
                             }
                             LinearProgressIndicator(
-                                progress = { viewModel.totalProgress },
+                                progress = viewModel.totalProgress,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(8.dp),
-                                strokeCap = StrokeCap.Round,
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.primaryContainer
                             )

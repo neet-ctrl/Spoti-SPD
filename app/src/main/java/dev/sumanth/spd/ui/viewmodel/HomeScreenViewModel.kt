@@ -3,6 +3,7 @@ package dev.sumanth.spd.ui.viewmodel
 import android.app.Application
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -67,8 +68,9 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             val clip = clipboard.primaryClip
             if (clip != null && clip.itemCount > 0) {
                 val text = clip.getItemAt(0).text.toString()
-                if (text.contains("spotify.com")) {
-                    spotifyLink = text
+                val normalizedUrl = normalizeSpotifyLink(text)
+                if (!normalizedUrl.isNullOrBlank()) {
+                    spotifyLink = normalizedUrl
                     Toast.makeText(getApplication(), "Pasted Spotify link", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(getApplication(), "Not a valid Spotify link", Toast.LENGTH_SHORT).show()
@@ -77,6 +79,24 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         } catch (e: Exception) {
             Toast.makeText(getApplication(), "Failed to paste: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun normalizeSpotifyLink(rawLink: String): String? {
+        val link = rawLink.trim()
+        if (link.startsWith("intent://")) {
+            val fallback = Regex("S\\.browser_fallback_url=([^;]+)").find(link)?.groups?.get(1)?.value
+            if (!fallback.isNullOrEmpty()) {
+                return Uri.decode(fallback)
+            }
+        }
+        if (link.startsWith("spotify:")) {
+            val path = link.removePrefix("spotify:").replace(":", "/")
+            return "https://open.spotify.com/$path"
+        }
+        if (link.contains("open.spotify.com") || link.contains("spotify.com")) {
+            return link
+        }
+        return null
     }
 
     fun startScraping() {
