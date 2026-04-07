@@ -31,3 +31,11 @@ jobs:
       - name: Build Debug APK
         id: build
         run: bash ./gradlew assembleDebug
+
+      - name: Upload Debug APK Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotify-playlist-downloader-debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
