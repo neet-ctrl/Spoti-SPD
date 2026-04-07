@@ -10,6 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 private val lightScheme = lightColorScheme(
     primary = primaryLight,
@@ -270,7 +272,105 @@ fun AppTheme(
 
   MaterialTheme(
     colorScheme = colorScheme,
+    shapes = modernShapes,
+    typography = modernTypography,
     content = content
   )
 }
+
+// ============= MODERN SHAPES =============
+private val modernShapes = androidx.compose.material3.Shapes(
+    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+)
+
+// ============= MODERN TYPOGRAPHY =============
+private val modernTypography = androidx.compose.material3.Typography(
+    // Display Styles (Large headings)
+    displayLarge = androidx.compose.material3.Typography().displayLarge.copy(
+        fontSize = 32.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        letterSpacing = (-0.5).sp
+    ),
+    displayMedium = androidx.compose.material3.Typography().displayMedium.copy(
+        fontSize = 28.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        letterSpacing = 0.sp
+    ),
+    displaySmall = androidx.compose.material3.Typography().displaySmall.copy(
+        fontSize = 24.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        letterSpacing = 0.sp
+    ),
+    // Headline Styles
+    headlineLarge = androidx.compose.material3.Typography().headlineLarge.copy(
+        fontSize = 22.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        letterSpacing = 0.sp
+    ),
+    headlineMedium = androidx.compose.material3.Typography().headlineMedium.copy(
+        fontSize = 20.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        letterSpacing = 0.15.sp
+    ),
+    headlineSmall = androidx.compose.material3.Typography().headlineSmall.copy(
+        fontSize = 18.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        letterSpacing = 0.15.sp
+    ),
+    // Title Styles
+    titleLarge = androidx.compose.material3.Typography().titleLarge.copy(
+        fontSize = 16.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        letterSpacing = 0.15.sp
+    ),
+    titleMedium = androidx.compose.material3.Typography().titleMedium.copy(
+        fontSize = 14.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        letterSpacing = 0.1.sp
+    ),
+    titleSmall = androidx.compose.material3.Typography().titleSmall.copy(
+        fontSize = 12.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        letterSpacing = 0.1.sp
+    ),
+    // Body Styles
+    bodyLarge = androidx.compose.material3.Typography().bodyLarge.copy(
+        fontSize = 16.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+        letterSpacing = 0.15.sp,
+        lineHeight = 24.sp
+    ),
+    bodyMedium = androidx.compose.material3.Typography().bodyMedium.copy(
+        fontSize = 14.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+        letterSpacing = 0.25.sp,
+        lineHeight = 20.sp
+    ),
+    bodySmall = androidx.compose.material3.Typography().bodySmall.copy(
+        fontSize = 12.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+        letterSpacing = 0.4.sp,
+        lineHeight = 16.sp
+    ),
+    // Label Styles
+    labelLarge = androidx.compose.material3.Typography().labelLarge.copy(
+        fontSize = 14.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+        letterSpacing = 0.1.sp
+    ),
+    labelMedium = androidx.compose.material3.Typography().labelMedium.copy(
+        fontSize = 12.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+        letterSpacing = 0.5.sp
+    ),
+    labelSmall = androidx.compose.material3.Typography().labelSmall.copy(
+        fontSize = 11.sp,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+        letterSpacing = 0.5.sp
+    )
+)
 

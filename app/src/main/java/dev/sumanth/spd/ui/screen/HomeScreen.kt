@@ -1,5 +1,10 @@
 package dev.sumanth.spd.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -22,13 +29,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -55,102 +63,139 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
 
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 80.dp)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Input Card with Paste Button
-            Card(
+            // ============= HEADER SECTION =============
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                shape = MaterialTheme.shapes.large
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Playlist Details", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Spotify Downloads",
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "Add your Spotify link to get started",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-                    // Text field with paste icon
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+            // ============= INPUT CARD WITH PASTE =============
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        "Paste Your Link",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // Input Field with Paste Button
+                    Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
                             value = viewModel.spotifyLink,
                             onValueChange = { viewModel.spotifyLink = it },
-                            label = { Text("Spotify Link") },
-                            modifier = Modifier.weight(1f),
-                            minLines = 2,
-                            maxLines = 3
-                        )
-                        IconButton(
-                            onClick = { viewModel.pasteFromClipboard() },
+                            label = { Text("Spotify Playlist / Album / Track") },
                             modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                    shape = MaterialTheme.shapes.small
-                                )
-                        ) {
-                            Icon(
-                                Icons.Filled.ContentPaste,
-                                contentDescription = "Paste from clipboard",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
+                                .fillMaxWidth()
+                                .height(100.dp),
+                            minLines = 3,
+                            maxLines = 4,
+                            shape = MaterialTheme.shapes.medium,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                             )
-                        }
+                        )
                     }
 
-                    // MP3 Conversion Toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    // Paste Button
+                    FilledTonalButton(
+                        onClick = { viewModel.pasteFromClipboard() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
                     ) {
-                        Text("Convert to MP3", style = MaterialTheme.typography.bodyLarge)
-                        Switch(checked = viewModel.convertToMp3, onCheckedChange = { viewModel.convertToMp3 = it })
+                        Icon(
+                            Icons.Filled.ContentPaste,
+                            contentDescription = "Paste",
+                            modifier = Modifier
+                                .size(20.dp)
+                                .padding(end = 8.dp)
+                        )
+                        Text("Paste from Clipboard")
                     }
-                }
-            }
 
-            // Scraping Progress Card
-            if (viewModel.appStatus == Status.SCRAPING) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    // Convert to MP3 Toggle
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = MaterialTheme.shapes.medium
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Scraping Playlist...", style = MaterialTheme.typography.bodyMedium)
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
+                            Column {
+                                Text(
+                                    "Convert to MP3",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "Higher compatibility",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = viewModel.convertToMp3,
+                                onCheckedChange = { viewModel.convertToMp3 = it }
                             )
                         }
                     }
                 }
             }
 
-            // Action Buttons
+            // ============= ACTION BUTTONS =============
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ElevatedButton(
                     onClick = { viewModel.startScraping() },
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
-                    enabled = viewModel.appStatus != Status.SCRAPING
+                        .fillMaxSize(),
+                    enabled = viewModel.appStatus != Status.SCRAPING,
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 6.dp)
                 ) {
                     if (viewModel.appStatus == Status.SCRAPING) {
                         CircularProgressIndicator(
@@ -159,7 +204,7 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("Scrape Playlist")
+                        Text("Scrape")
                     }
                 }
                 
@@ -167,139 +212,234 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                     onClick = { viewModel.downloadPlaylist() },
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
-                    enabled = viewModel.appStatus == Status.SCRAPED
+                        .fillMaxSize(),
+                    enabled = viewModel.appStatus == Status.SCRAPED,
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 6.dp),
+                    colors = ButtonDefaults.elevatedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
                 ) {
                     if (viewModel.appStatus == Status.DOWNLOADING) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = MaterialTheme.colorScheme.onSecondary
                         )
                     } else {
                         Text("Download")
                     }
                 }
+            }
 
-                if (viewModel.appStatus == Status.DOWNLOADING) {
-                    OutlinedButton(
-                        onClick = { viewModel.cancelDownload() },
-                        modifier = Modifier.height(48.dp)
+            // ============= SUCCESS ANIMATION =============
+            AnimatedVisibility(
+                visible = viewModel.appStatus == Status.SCRAPED,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Cancel")
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Text("✓", color = MaterialTheme.colorScheme.onPrimary)
+                            }
+                        }
+                        Column {
+                            Text(
+                                "Ready to Download",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                            Text(
+                                "${viewModel.spotifyList.length()} songs found",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
             }
 
-            // Scrape Complete Message
-            if (viewModel.appStatus == Status.SCRAPED) {
-                Surface(
+            // ============= PROGRESS CARDS =============
+            AnimatedVisibility(
+                visible = viewModel.totalProgress > 0f,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = "✓ Scraping complete! ${viewModel.spotifyList.length()} songs found",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-            }
-
-            // Download Progress Card
-            if (viewModel.totalProgress > 0f) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
+                    shape = MaterialTheme.shapes.large
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        val statusText = when {
-                            viewModel.totalProgress == 1f -> "Download complete"
-                            else -> viewModel.fileName
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (viewModel.totalProgress == 1f) "Complete!" 
+                                else "Downloading...",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (viewModel.appStatus == Status.DOWNLOADING) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
                         }
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
 
+                        // Current File
                         if (viewModel.totalProgress < 1f) {
-                            // File progress bar
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    "File Progress",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
+                                    viewModel.fileName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 LinearProgressIndicator(
                                     progress = { viewModel.fileProgress },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(6.dp),
-                                    strokeCap = StrokeCap.Round
+                                    strokeCap = StrokeCap.Round,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    trackColor = MaterialTheme.colorScheme.secondaryContainer
                                 )
                                 Text(
-                                    text = String.format(Locale.ENGLISH, "%.1f%%", viewModel.fileProgress * 100),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    textAlign = TextAlign.End,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-
-                            // Total progress bar
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    "Overall Progress",
+                                    String.format(Locale.ENGLISH, "%.0f%%", viewModel.fileProgress * 100),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
-                                LinearProgressIndicator(
-                                    progress = { viewModel.totalProgress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp),
-                                    strokeCap = StrokeCap.Round
+                            }
+                        }
+
+                        // Overall Progress
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Overall Progress",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = String.format(Locale.ENGLISH, "%.1f%% (${(viewModel.spotifyList.length() * viewModel.totalProgress).toInt()}/${viewModel.spotifyList.length()})", viewModel.totalProgress * 100),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    textAlign = TextAlign.End,
-                                    modifier = Modifier.fillMaxWidth()
+                                    "${(viewModel.spotifyList.length() * viewModel.totalProgress).toInt()}/${viewModel.spotifyList.length()}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                 )
+                            }
+                            LinearProgressIndicator(
+                                progress = { viewModel.totalProgress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp),
+                                strokeCap = StrokeCap.Round,
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                            Text(
+                                String.format(Locale.ENGLISH, "%.1f%%", viewModel.totalProgress * 100),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.End
+                            )
+                        }
+
+                        // Cancel Button
+                        if (viewModel.appStatus == Status.DOWNLOADING) {
+                            FilledTonalButton(
+                                onClick = { viewModel.cancelDownload() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Cancel Download")
                             }
                         }
                     }
                 }
             }
 
-            // Failed Tracks Card
-            if (viewModel.failedTracks.isNotEmpty()) {
-                Card(
+            // ============= FAILED DOWNLOADS CARD =============
+            AnimatedVisibility(
+                visible = viewModel.failedTracks.isNotEmpty(),
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "${viewModel.getFailedDownloadsCount()} songs failed to download",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Filled.Error,
+                                contentDescription = "Error",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column {
+                                Text(
+                                    "${viewModel.getFailedDownloadsCount()} songs failed",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                )
+                                Text(
+                                    "Tap retry to try again",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
                         Button(
                             onClick = { viewModel.retryFailedDownloads() },
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
                             enabled = viewModel.appStatus == Status.COMPLETED,
+                            shape = MaterialTheme.shapes.medium,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error
                             )
@@ -307,115 +447,20 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                             if (viewModel.appStatus == Status.RETRYING) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
-                                    color = MaterialTheme.colorScheme.onError,
-                                    strokeWidth = 2.dp
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onError
                                 )
                             } else {
-                                Icon(Icons.Filled.Refresh, contentDescription = "Retry", modifier = Modifier.size(20.dp))
-                                Text("   Retry Failed Downloads")
+                                Icon(Icons.Filled.Refresh, contentDescription = "Retry", modifier = Modifier.size(18.dp))
+                                Text("   Retry Failed")
                             }
                         }
                     }
                 }
             }
 
-            // Download History Section
-            if (viewModel.downloadHistory.isNotEmpty()) {
-                Text(
-                    "Download History",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-                
-                viewModel.downloadHistory.take(10).forEach { item ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        item.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        item.artist,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { viewModel.deleteHistoryItem(item.id) },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Delete,
-                                        contentDescription = "Delete",
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        item.getFormattedDate(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
-                                    Text(
-                                        item.getSummary(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                
-                                Surface(
-                                    color = when (item.status) {
-                                        DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.primaryContainer
-                                        DownloadStatus.PARTIAL -> MaterialTheme.colorScheme.tertiaryContainer
-                                        DownloadStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
-                                        else -> MaterialTheme.colorScheme.surfaceVariant
-                                    },
-                                    shape = MaterialTheme.shapes.small
-                                ) {
-                                    Text(
-                                        item.status.name,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                if (viewModel.downloadHistory.isNotEmpty()) {
-                    FilledTonalButton(
-                        onClick = { viewModel.clearHistory() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Clear All History")
-                    }
-                }
-            }
+            // Spacing
+            Box(modifier = Modifier.height(16.dp))
         }
     }
 }
