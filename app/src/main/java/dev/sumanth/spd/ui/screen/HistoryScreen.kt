@@ -31,8 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -217,11 +215,10 @@ fun HistoryScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                         )
                                     }
                                     LinearProgressIndicator(
-                                        progress = { item.getSuccessRate().toFloat() / 100 },
+                                        progress = { item.getSuccessRate().toFloat() / 100f },
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(6.dp),
-                                        strokeCap = StrokeCap.Round
+                                            .height(6.dp)
                                     )
                                 }
                             }
