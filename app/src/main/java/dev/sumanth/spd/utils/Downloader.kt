@@ -14,9 +14,12 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeMusicSearchExtractor
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 data class FileMeta(val url: String, val name: String, val extention: String)
 
@@ -147,6 +150,21 @@ object DownloadManager {
             }
         } catch (e: Exception) {
             null
+        }
+    }
+
+    fun createZipFile(files: List<File>, zipFilePath: String) {
+        ZipOutputStream(FileOutputStream(zipFilePath)).use { zipOut ->
+            files.forEach { file ->
+                if (file.exists()) {
+                    FileInputStream(file).use { fis ->
+                        val zipEntry = ZipEntry(file.name)
+                        zipOut.putNextEntry(zipEntry)
+                        fis.copyTo(zipOut)
+                        zipOut.closeEntry()
+                    }
+                }
+            }
         }
     }
 }

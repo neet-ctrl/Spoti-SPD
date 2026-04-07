@@ -17,6 +17,7 @@ import dev.sumanth.spd.model.Track
 import dev.sumanth.spd.utils.DownloadHistoryManager
 import dev.sumanth.spd.utils.DownloadManager
 import dev.sumanth.spd.utils.SharedPref
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -45,6 +46,15 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     
     var downloadHistory by mutableStateOf(listOf<DownloadHistoryItem>())
     var currentDownload by mutableStateOf<DownloadHistoryItem?>(null)
+    
+    // New state for enhanced UI
+    var selectedSongs by mutableStateOf(setOf<Int>())
+    var isSelectionMode by mutableStateOf(false)
+    var showDownloadDialog by mutableStateOf(false)
+    var showPlayer by mutableStateOf(false)
+    var currentPlayingIndex by mutableStateOf(-1)
+    var isShuffleMode by mutableStateOf(false)
+    var isPlaying by mutableStateOf(false)
     
     private fun sanitizeFilename(name: String): String {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
@@ -227,5 +237,236 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     fun clearHistory() {
         historyManager.clearAllHistory()
         loadHistory()
+    }
+    
+    // New methods for enhanced UI
+    fun toggleSongSelection(index: Int) {
+        if (isSelectionMode) {
+            selectedSongs = if (selectedSongs.contains(index)) {
+                selectedSongs - index
+            } else {
+                selectedSongs + index
+            }
+            if (selectedSongs.isEmpty()) {
+                isSelectionMode = false
+            }
+        } else {
+            isSelectionMode = true
+            selectedSongs = setOf(index)
+        }
+    }
+    
+    fun selectAllSongs() {
+        selectedSongs = (0 until spotifyList.length()).toSet()
+        isSelectionMode = true
+    }
+    
+    fun clearSelection() {
+        selectedSongs = emptySet()
+        isSelectionMode = false
+    }
+    
+    fun enterSelectionMode() {
+        isSelectionMode = true
+    }
+    
+    fun downloadSelectedSongs() {
+        if (selectedSongs.isNotEmpty()) {
+            showDownloadDialog = true
+        }
+    }
+    
+    fun downloadSelectedSongsAsZip() {
+        if (selectedSongs.isEmpty()) return
+        
+        viewModelScope.launch {
+            try {
+                appStatus = Status.DOWNLOADING
+                val downloadPath = sharedPref.getDownloadPath()
+                val tempDir = File("$downloadPath/temp_zip_${System.currentTimeMillis()}")
+                tempDir.mkdirs()
+                
+                val downloadedFiles = mutableListOf<File>()
+                var successfulDownloads = 0
+                var failedDownloads = 0
+                
+                // Download all selected songs to temp directory
+                selectedSongs.sorted().forEachIndexed { index, songIndex ->
+                    if (songIndex in 0 until spotifyList.length()) {
+                        val track = spotifyList.getJSONObject(songIndex)
+                        val trackName = track.getString("title")
+                        val artist = track.getString("artist")
+                        
+                        try {
+                            fileName = "Downloading ${index + 1}/${selectedSongs.size}: $trackName"
+                            totalProgress = (index.toFloat() / selectedSongs.size) * 0.9f // 90% for downloads
+                            
+                            val fileMeta = withContext(Dispatchers.IO) {
+                                DownloadManager.getFileMeta(trackName, artist)
+                            }
+                            
+                            val sanitizedName = sanitizeFilename(trackName)
+                            val tempPath = "${tempDir.absolutePath}/$sanitizedName"
+                            
+                            withContext(Dispatchers.IO) {
+                                DownloadManager.downloadFile(fileMeta.url, "$tempPath.${fileMeta.extention}") { b, c ->
+                                    fileProgress = (b * 100 / c).toFloat() / 100
+                                }
+                                
+                                if (convertToMp3) {
+                                    DownloadManager.convertToMp3(tempPath, fileMeta.extention, trackName, artist)
+                                    downloadedFiles.add(File("$tempPath.mp3"))
+                                } else {
+                                    DownloadManager.tagFile(tempPath, fileMeta.extention, trackName, artist)
+                                    downloadedFiles.add(File("$tempPath.${fileMeta.extention}"))
+                                }
+                            }
+                            
+                            successfulDownloads++
+                        } catch (e: Exception) {
+                            failedDownloads++
+                            e.printStackTrace()
+                        }
+                    }
+                }
+                
+                // Create ZIP file
+                fileName = "Creating ZIP archive..."
+                totalProgress = 0.95f
+                
+                val zipFileName = "Spotify_Download_${System.currentTimeMillis()}.zip"
+                val zipPath = "$downloadPath/$zipFileName"
+                
+                withContext(Dispatchers.IO) {
+                    DownloadManager.createZipFile(downloadedFiles, zipPath)
+                }
+                
+                // Clean up temp files
+                tempDir.deleteRecursively()
+                
+                // Add to history
+                val historyItem = DownloadHistoryItem(
+                    spotifyUrl = spotifyLink,
+                    title = "ZIP Archive: ${selectedSongs.size} songs",
+                    artist = "",
+                    totalTracks = selectedSongs.size,
+                    successfulTracks = successfulDownloads,
+                    failedTracks = failedDownloads,
+                    filePath = zipPath,
+                    convertedToMp3 = convertToMp3,
+                    status = if (failedDownloads == 0) DownloadStatus.COMPLETED else DownloadStatus.PARTIAL
+                )
+                historyManager.addHistory(historyItem)
+                loadHistory()
+                
+                totalProgress = 1f
+                appStatus = Status.SCRAPED
+                
+                clearSelection()
+                showDownloadDialog = false
+                
+                Toast.makeText(getApplication(), "ZIP created: $zipFileName", Toast.LENGTH_LONG).show()
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+                appStatus = Status.SCRAPED
+                Toast.makeText(getApplication(), "ZIP creation failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    
+    fun downloadSongAtIndex(index: Int) {
+        if (index in 0 until spotifyList.length()) {
+            val track = spotifyList.getJSONObject(index)
+            val trackName = track.getString("title")
+            val artist = track.getString("artist")
+            
+            viewModelScope.launch {
+                try {
+                    val downloadPath = sharedPref.getDownloadPath()
+                    val fileMeta = withContext(Dispatchers.IO) {
+                        DownloadManager.getFileMeta(trackName, artist)
+                    }
+                    fileName = "Downloading $trackName"
+                    val path = "$downloadPath/${sanitizeFilename(trackName)}"
+                    
+                    withContext(Dispatchers.IO) {
+                        DownloadManager.downloadFile(fileMeta.url, "$path.${fileMeta.extention}") { b, c ->
+                            fileProgress = (b * 100 / c).toFloat() / 100
+                        }
+                        if (convertToMp3) {
+                            DownloadManager.convertToMp3(path, fileMeta.extention, trackName, artist)
+                        } else {
+                            DownloadManager.tagFile(path, fileMeta.extention, trackName, artist)
+                        }
+                    }
+                    
+                    // Add to history
+                    val historyItem = DownloadHistoryItem(
+                        spotifyUrl = spotifyLink,
+                        title = trackName,
+                        artist = artist,
+                        totalTracks = 1,
+                        successfulTracks = 1,
+                        failedTracks = 0,
+                        filePath = path,
+                        convertedToMp3 = convertToMp3,
+                        status = DownloadStatus.COMPLETED
+                    )
+                    historyManager.addHistory(historyItem)
+                    loadHistory()
+                    
+                    Toast.makeText(getApplication(), "Downloaded: $trackName", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(getApplication(), "Download failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    
+    fun playSongAtIndex(index: Int) {
+        currentPlayingIndex = index
+        showPlayer = true
+        isPlaying = true
+    }
+    
+    fun togglePlayPause() {
+        isPlaying = !isPlaying
+    }
+    
+    fun nextSong() {
+        if (currentPlayingIndex < spotifyList.length() - 1) {
+            currentPlayingIndex++
+        } else if (isShuffleMode) {
+            currentPlayingIndex = (0 until spotifyList.length()).random()
+        } else {
+            currentPlayingIndex = 0
+        }
+    }
+    
+    fun previousSong() {
+        if (currentPlayingIndex > 0) {
+            currentPlayingIndex--
+        } else {
+            currentPlayingIndex = spotifyList.length() - 1
+        }
+    }
+    
+    fun toggleShuffle() {
+        isShuffleMode = !isShuffleMode
+    }
+    
+    fun closePlayer() {
+        showPlayer = false
+        isPlaying = false
+        currentPlayingIndex = -1
+    }
+    
+    fun getCurrentSong(): Track? {
+        if (currentPlayingIndex in 0 until spotifyList.length()) {
+            val track = spotifyList.getJSONObject(currentPlayingIndex)
+            return Track(track.getString("title"), track.getString("artist"))
+        }
+        return null
     }
 }
