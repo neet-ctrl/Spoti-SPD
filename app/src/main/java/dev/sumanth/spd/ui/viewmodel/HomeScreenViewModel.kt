@@ -1,6 +1,8 @@
 package dev.sumanth.spd.ui.viewmodel
 
 import android.app.Application
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -8,7 +10,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sumanth.spd.model.DownloadHistoryItem
+import dev.sumanth.spd.model.DownloadStatus
 import dev.sumanth.spd.model.Track
+import dev.sumanth.spd.utils.DownloadHistoryManager
 import dev.sumanth.spd.utils.DownloadManager
 import dev.sumanth.spd.utils.SharedPref
 import kotlinx.coroutines.Dispatchers
@@ -29,23 +34,55 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     var fileProgress by mutableFloatStateOf(0f)
     var totalProgress by mutableFloatStateOf(0f)
+    var scrapingProgress by mutableFloatStateOf(0f)
     var fileName by mutableStateOf("")
     var spotifyLink by mutableStateOf("")
     var convertToMp3 by mutableStateOf(false)
     private val sharedPref = SharedPref(application)
+    private val historyManager = DownloadHistoryManager(application)
     private var downloadJob: Job? = null
+    
+    var downloadHistory by mutableStateOf(listOf<DownloadHistoryItem>())
+    var currentDownload by mutableStateOf<DownloadHistoryItem?>(null)
+    
     private fun sanitizeFilename(name: String): String {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
     }
+    
     val failedTracks = mutableListOf<Track>()
     var appStatus by mutableStateOf(Status.IDLE)
-
     var spotifyList by mutableStateOf(JSONArray())
 
+    init {
+        loadHistory()
+    }
+
+    fun loadHistory() {
+        downloadHistory = historyManager.getHistory()
+    }
+
+    fun pasteFromClipboard() {
+        try {
+            val clipboard = getApplication<Application>().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val text = clip.getItemAt(0).text.toString()
+                if (text.contains("spotify.com")) {
+                    spotifyLink = text
+                    Toast.makeText(getApplication(), "Pasted Spotify link", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(getApplication(), "Not a valid Spotify link", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception) {
+            Toast.makeText(getApplication(), "Failed to paste: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun startScraping() {
         if (spotifyLink.isBlank()) return Toast.makeText(getApplication(), "Spotify link is invalid.", Toast.LENGTH_SHORT).show()
         appStatus = Status.SCRAPING
+        scrapingProgress = 0f
     }
 
     fun downloadPlaylist() {
@@ -55,7 +92,19 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             failedTracks.clear()
             try {
                 val downloadPath = sharedPref.getDownloadPath()
+                
+                // Create history item
+                currentDownload = DownloadHistoryItem(
+                    spotifyUrl = spotifyLink,
+                    title = "Downloading...",
+                    artist = "Multiple songs",
+                    totalTracks = spotifyList.length(),
+                    filePath = downloadPath,
+                    convertedToMp3 = convertToMp3,
+                    status = DownloadStatus.DOWNLOADING
+                )
 
+                var successCount = 0
                 for (i in 0 until spotifyList.length()) {
                     val track = spotifyList.getJSONObject(i)
                     val trackName = track.getString("title")
@@ -77,12 +126,24 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                             }
                         }
                         totalProgress = (i + 1).toFloat() / spotifyList.length()
+                        successCount++
                     } catch (e: Exception) {
                         e.printStackTrace()
                         failedTracks.add(Track(trackName, artist))
                     }
-
                 }
+                
+                // Save to history
+                currentDownload?.let { download ->
+                    historyManager.addHistory(
+                        download.copy(
+                            status = if (failedTracks.isEmpty()) DownloadStatus.COMPLETED else DownloadStatus.PARTIAL,
+                            successfulTracks = successCount,
+                            failedTracks = failedTracks.size
+                        )
+                    )
+                }
+                loadHistory()
                 appStatus = Status.COMPLETED
             } catch (e: Exception) {
                 appStatus = Status.IDLE
@@ -97,6 +158,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         fileName = "Download cancelled"
         totalProgress = 0f
     }
+    
     fun retryFailedDownloads() {
         downloadJob = viewModelScope.launch {
             appStatus = Status.DOWNLOADING
@@ -134,5 +196,16 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
+    
     fun getFailedDownloadsCount(): Int = failedTracks.size
+    
+    fun deleteHistoryItem(id: String) {
+        historyManager.deleteHistory(id)
+        loadHistory()
+    }
+    
+    fun clearHistory() {
+        historyManager.clearAllHistory()
+        loadHistory()
+    }
 }

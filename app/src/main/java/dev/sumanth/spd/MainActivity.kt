@@ -11,8 +11,10 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.derivedStateOf
@@ -26,6 +28,7 @@ import dev.sumanth.spd.ui.component.PermissionDialog
 import dev.sumanth.spd.ui.component.TopBar
 import dev.sumanth.spd.ui.component.UpdateDialog
 import dev.sumanth.spd.ui.screen.HomeScreen
+import dev.sumanth.spd.ui.screen.HistoryScreen
 import dev.sumanth.spd.ui.screen.PreferencesScreen
 import dev.sumanth.spd.ui.viewmodel.UpdaterViewModel
 import dev.sumanth.spd.utils.NewPipeDownloader
@@ -36,6 +39,7 @@ class MainActivity : ComponentActivity() {
 
     private val navigationItems = listOf(
         NavigationItem("Home", Icons.Filled.Home, Icons.Outlined.Home),
+        NavigationItem("History", Icons.Filled.History, Icons.Outlined.History),
         NavigationItem("Preferences", Icons.Filled.Settings, Icons.Outlined.Settings)
     )
 
@@ -72,7 +76,8 @@ class MainActivity : ComponentActivity() {
                     ) { page ->
                         when (page) {
                             0 -> HomeScreen()
-                            1 -> PreferencesScreen()
+                            1 -> HistoryScreen()
+                            2 -> PreferencesScreen()
                         }
                     }
 
