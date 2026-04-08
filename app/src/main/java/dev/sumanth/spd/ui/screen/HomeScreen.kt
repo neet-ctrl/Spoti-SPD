@@ -1028,7 +1028,7 @@ fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
                 .pointerInput(viewModel.playerOffsetX, viewModel.playerOffsetY) {
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
-                            change.consumeAllChanges()
+                            change.consume()
                             val nextX = viewModel.playerOffsetX + dragAmount.x
                             val nextY = viewModel.playerOffsetY + dragAmount.y
                             viewModel.updatePlayerPosition(
@@ -1046,7 +1046,7 @@ fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
                                 if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
                             }
                         }
-                    }
+                    )
                 }
         ) {
             Surface(
