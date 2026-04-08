@@ -227,6 +227,7 @@ fun HistoryScreen(viewModel: HomeScreenViewModel = viewModel()) {
                             }
 
                             // File path (clickable)
+                            val context = LocalContext.current
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
