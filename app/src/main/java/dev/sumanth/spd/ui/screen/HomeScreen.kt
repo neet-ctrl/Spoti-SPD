@@ -72,7 +72,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -1032,46 +1032,60 @@ fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
                         viewModel.playerOffsetY.roundToInt().coerceIn(0, maxOffsetY.roundToInt())
                     )
                 }
-                .pointerInput(viewModel.playerOffsetX, viewModel.playerOffsetY) {
-                    detectDragGestures(
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val nextX = viewModel.playerOffsetX + dragAmount.x
-                            val nextY = viewModel.playerOffsetY + dragAmount.y
-                            viewModel.updatePlayerPosition(
-                                nextX.coerceIn(0f, maxOffsetX),
-                                nextY.coerceIn(0f, maxOffsetY)
-                            )
-                        },
-                        onDragEnd = {
-                            val x = viewModel.playerOffsetX
-                            if (x <= snapThreshold) {
-                                viewModel.updatePlayerPosition(0f, viewModel.playerOffsetY)
-                                if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
-                            } else if (x >= maxWidthPx - playerWidthPx - snapThreshold) {
-                                viewModel.updatePlayerPosition(maxWidthPx - playerWidthPx, viewModel.playerOffsetY)
-                                if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
-                            }
-                        }
-                    )
-                }
         ) {
             Surface(
                 modifier = Modifier
                     .size(playerWidth, playerHeight)
                     .clip(MaterialTheme.shapes.large)
                     .background(MaterialTheme.colorScheme.surface)
+                    .border(2.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
                     .zIndex(10f)
                     .clickable {
                         if (viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
                     },
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 16.dp
+                tonalElevation = 16.dp,
+                shadowElevation = 8.dp
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .pointerInput(viewModel.playerOffsetX, viewModel.playerOffsetY) {
+                                detectDragGestures(
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val nextX = viewModel.playerOffsetX + dragAmount.x
+                                        val nextY = viewModel.playerOffsetY + dragAmount.y
+                                        viewModel.updatePlayerPosition(
+                                            nextX.coerceIn(0f, maxOffsetX),
+                                            nextY.coerceIn(0f, maxOffsetY)
+                                        )
+                                    },
+                                    onDragEnd = {
+                                        val x = viewModel.playerOffsetX
+                                        if (x <= snapThreshold) {
+                                            viewModel.updatePlayerPosition(0f, viewModel.playerOffsetY)
+                                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                                        } else if (x >= maxWidthPx - playerWidthPx - snapThreshold) {
+                                            viewModel.updatePlayerPosition(maxWidthPx - playerWidthPx, viewModel.playerOffsetY)
+                                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                                        }
+                                    }
+                                )
+                            }
+                    ) {
+                        Text(
+                            "⋮⋮",
+                            modifier = Modifier.align(Alignment.Center),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1176,4 +1190,5 @@ fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
             }
         }
     }
+}
 }
