@@ -3,20 +3,18 @@ package dev.sumanth.spd
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -27,11 +25,21 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import dev.sumanth.spd.model.NavigationItem
 import dev.sumanth.spd.ui.component.Background
 import dev.sumanth.spd.ui.component.BottomBar
@@ -67,16 +75,16 @@ class MainActivity : ComponentActivity() {
 
         NewPipe.init(NewPipeDownloader.getInstance())
 
-        setContent {
+        // Check for crash log
+        val crashSharedPref = getSharedPreferences("crash_log", MODE_PRIVATE)
+        val crashError = crashSharedPref.getString("error", null)
+        val crashStack = crashSharedPref.getString("stack", "") ?: ""
+        val hasCrash = crashError != null
+        if (hasCrash) {
+            crashSharedPref.edit().clear().apply()
+        }
 
-            // Check for crash log
-            val crashSharedPref = remember { getSharedPreferences("crash_log", MODE_PRIVATE) }
-            val crashError = remember { crashSharedPref.getString("error", null) }
-            val crashStack = remember { crashSharedPref.getString("stack", "") ?: "" }
-            val hasCrash = crashError != null
-            if (hasCrash) {
-                crashSharedPref.edit().clear().apply()
-            }
+        setContent {
 
             val pagerState = rememberPagerState(pageCount = { navigationItems.size })
             val title by remember {
@@ -103,7 +111,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    PermissionDialog(this)
+                    PermissionDialog(this@MainActivity)
                     UpdateDialog(updateViewModel)
                     if (showCrashDialog) {
                         CrashDialog(
