@@ -1,5 +1,9 @@
 package dev.sumanth.spd.ui.screen
 
+import android.content.Intent
+import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -695,32 +699,87 @@ fun DownloadDialog(viewModel: HomeScreenViewModel) {
     val sharedPref = remember { dev.sumanth.spd.utils.SharedPref(context) }
     var downloadPath by remember { mutableStateOf(sharedPref.getDownloadPath()) }
     var isExpanded by remember { mutableStateOf(false) }
+    var showFullPath by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let {
+            val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(it, takeFlags)
+
+            val segments = uri.path?.split(":")
+            if (segments != null && segments.size > 1) {
+                val folderPath = segments[1]
+                val storageBase = if (uri.path?.contains("primary") == true) {
+                    Environment.getExternalStorageDirectory().path
+                } else {
+                    "/storage/${segments[0].split("/").last()}"
+                }
+
+                downloadPath = "$storageBase/$folderPath"
+                sharedPref.storeDownloadPath(downloadPath)
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = { viewModel.showDownloadDialog = false },
         title = { Text("Download Options") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Location
-                Row(
+                // Location section
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.medium
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Location:", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            downloadPath,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    TextButton(onClick = {
-                        // TODO: Implement location picker
-                    }) {
-                        Text("Change")
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Download Location:", style = MaterialTheme.typography.labelMedium)
+                        
+                        // Path display
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
+                                    .heightIn(max = if (showFullPath) 120.dp else 40.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (showFullPath) {
+                                    Text(
+                                        downloadPath,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                } else {
+                                    Text(
+                                        downloadPath,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            TextButton(onClick = { showFullPath = !showFullPath }) {
+                                Text(if (showFullPath) "Hide Path" else "Show Full Path")
+                            }
+                            Button(onClick = { launcher.launch(null) }) {
+                                Text("Change Location")
+                            }
+                        }
                     }
                 }
 
@@ -732,23 +791,39 @@ fun DownloadDialog(viewModel: HomeScreenViewModel) {
 
                 // Expandable song list
                 if (isExpanded) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        viewModel.selectedSongs.sorted().forEach { index ->
-                            if (index in 0 until viewModel.spotifyList.length()) {
-                                val track = viewModel.spotifyList.getJSONObject(index)
-                                val title = track.getString("title")
-                                val artist = track.getString("artist")
-                                Text(
-                                    "${index + 1}. $title - $artist",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 150.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(viewModel.selectedSongs.sorted().size) { index ->
+                                val songIndex = viewModel.selectedSongs.sorted()[index]
+                                if (songIndex in 0 until viewModel.spotifyList.length()) {
+                                    val track = viewModel.spotifyList.getJSONObject(songIndex)
+                                    val title = track.getString("title")
+                                    val artist = track.getString("artist")
+                                    Text(
+                                        "${index + 1}. $title - $artist",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
                 TextButton(onClick = { isExpanded = !isExpanded }) {
-                    Text(if (isExpanded) "Collapse" else "Show Songs")
+                    Text(if (isExpanded) "Collapse Songs" else "Show All Songs (${viewModel.selectedSongs.size})")
                 }
             }
         },
