@@ -1060,6 +1060,7 @@ fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
                     .size(playerWidth, playerHeight)
                     .clip(MaterialTheme.shapes.large)
                     .background(MaterialTheme.colorScheme.surface)
+                    .zIndex(10f)
                     .clickable {
                         if (viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
                     },

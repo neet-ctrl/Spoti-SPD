@@ -267,7 +267,7 @@ fun HistoryScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                             val file = java.io.File(item.filePath)
                                             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, "resource/folder")
+                                                setData(uri)
                                                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                                 addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
