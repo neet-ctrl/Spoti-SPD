@@ -64,7 +64,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     // Media Player state
     var currentTime by mutableFloatStateOf(0f)
     var duration by mutableFloatStateOf(0f)
-    var volume by mutableFloatStateOf(1f)
+    private var _volume by mutableFloatStateOf(1f)
+    val volume: Float get() = _volume
     var repeatMode by mutableStateOf(RepeatMode.NONE) // NONE, ONE, ALL
     var isPlayerCollapsed by mutableStateOf(false)
     var playerOffsetX by mutableFloatStateOf(0f)
@@ -576,8 +577,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
     
     fun setVolume(newVolume: Float) {
-        volume = newVolume.coerceIn(0f, 1f)
-        mediaPlayer?.setVolume(volume, volume)
+        _volume = newVolume.coerceIn(0f, 1f)
+        mediaPlayer?.setVolume(_volume, _volume)
     }
     
     fun toggleRepeatMode() {
