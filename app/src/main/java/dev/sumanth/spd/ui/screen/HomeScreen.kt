@@ -89,6 +89,7 @@ import dev.sumanth.spd.ui.viewmodel.RepeatMode
 import dev.sumanth.spd.model.DownloadStatus
 import dev.sumanth.spd.model.Track
 import java.util.Locale
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1025,24 +1026,28 @@ fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
                     )
                 }
                 .pointerInput(viewModel.playerOffsetX, viewModel.playerOffsetY) {
-                    detectVerticalDragGestures(onDrag = { change, dragAmount ->
-                        change.consume()
-                        val nextX = viewModel.playerOffsetX + dragAmount.x
-                        val nextY = viewModel.playerOffsetY + dragAmount.y
-                        viewModel.updatePlayerPosition(
-                            nextX.coerceIn(0f, maxOffsetX),
-                            nextY.coerceIn(0f, maxOffsetY)
-                        )
-                    }, onDragEnd = {
-                        val x = viewModel.playerOffsetX
-                        if (x <= snapThreshold) {
-                            viewModel.updatePlayerPosition(0f, viewModel.playerOffsetY)
-                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
-                        } else if (x >= maxWidthPx - playerWidthPx - snapThreshold) {
-                            viewModel.updatePlayerPosition(maxWidthPx - playerWidthPx, viewModel.playerOffsetY)
-                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consumeAllChanges()
+                            val nextX = viewModel.playerOffsetX + dragAmount.x
+                            val nextY = viewModel.playerOffsetY + dragAmount.y
+                            viewModel.updatePlayerPosition(
+                                nextX.coerceIn(0f, maxOffsetX),
+                                nextY.coerceIn(0f, maxOffsetY)
+                            )
+                        },
+                        onDragEnd = {
+                            val x = viewModel.playerOffsetX
+                            if (x <= snapThreshold) {
+                                viewModel.updatePlayerPosition(0f, viewModel.playerOffsetY)
+                                if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                            } else if (x >= maxWidthPx - playerWidthPx - snapThreshold) {
+                                viewModel.updatePlayerPosition(maxWidthPx - playerWidthPx, viewModel.playerOffsetY)
+                                if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                            }
                         }
-                    })
+                    }
+                }
         ) {
             Surface(
                 modifier = Modifier

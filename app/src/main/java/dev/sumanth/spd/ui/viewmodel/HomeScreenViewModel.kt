@@ -473,22 +473,22 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                         setDataSource(fileMeta.url)
                         setVolume(volume, volume)
                         setOnPreparedListener { mp ->
-                            duration = mp.duration / 1000f
-                            currentTime = 0f
-                            isPlayerLoading = false
-                            isPlaying = true
+                            this@HomeScreenViewModel.duration = mp.duration / 1000f
+                            this@HomeScreenViewModel.currentTime = 0f
+                            this@HomeScreenViewModel.isPlayerLoading = false
+                            this@HomeScreenViewModel.isPlaying = true
                             mp.start()
-                            startPlaybackProgressUpdater()
+                            this@HomeScreenViewModel.startPlaybackProgressUpdater()
                         }
                         setOnCompletionListener {
-                            when (repeatMode) {
+                            when (this@HomeScreenViewModel.repeatMode) {
                                 RepeatMode.ONE -> {
                                     it.seekTo(0)
                                     it.start()
                                 }
-                                RepeatMode.ALL -> nextSong()
+                                RepeatMode.ALL -> this@HomeScreenViewModel.nextSong()
                                 else -> {
-                                    isPlaying = false
+                                    this@HomeScreenViewModel.isPlaying = false
                                 }
                             }
                         }
