@@ -1,10 +1,14 @@
 package dev.sumanth.spd
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -56,12 +60,23 @@ class MainActivity : ComponentActivity() {
 
         NewPipe.init(NewPipeDownloader.getInstance())
 
+        // Check for crash log
+        val crashSharedPref = getSharedPreferences("crash_log", MODE_PRIVATE)
+        val crashError = crashSharedPref.getString("error", null)
+        val crashStack = crashSharedPref.getString("stack", "") ?: ""
+        val hasCrash = crashError != null
+        if (hasCrash) {
+            crashSharedPref.edit().clear().apply()
+        }
+
         setContent {
 
             val pagerState = rememberPagerState(pageCount = { navigationItems.size })
             val title by remember {
                 derivedStateOf { navigationItems[pagerState.currentPage].title }
             }
+
+            var showCrashDialog by remember { mutableStateOf(hasCrash) }
 
             Background {
                 Scaffold(
@@ -83,8 +98,57 @@ class MainActivity : ComponentActivity() {
 
                     PermissionDialog(this)
                     UpdateDialog(updateViewModel)
+                    if (showCrashDialog) {
+                        CrashDialog(
+                            errorMessage = crashError ?: "Unknown error",
+                            stackTrace = crashStack,
+                            onDismiss = { showCrashDialog = false }
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+fun CrashDialog(
+    errorMessage: String,
+    stackTrace: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("App Crashed") },
+        text = {
+            Column {
+                Text("An unexpected error occurred:")
+                Text(errorMessage, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Stack Trace:")
+                OutlinedTextField(
+                    value = stackTrace,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.height(200.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Crash Log", "$errorMessage\n\n$stackTrace")
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(context, "Crash log copied to clipboard", Toast.LENGTH_SHORT).show()
+            }) {
+                Text("Copy")
+            }
+        }
+    )
 }
