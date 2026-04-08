@@ -11,10 +11,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -138,17 +140,19 @@ fun CrashDialog(
         onDismissRequest = onDismiss,
         title = { Text("App Crashed") },
         text = {
-            Column {
-                Text("An unexpected error occurred:")
-                Text(errorMessage, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Stack Trace:")
-                OutlinedTextField(
-                    value = stackTrace,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.height(200.dp)
-                )
+            Box(modifier = Modifier.heightIn(max = 400.dp)) {
+                Column {
+                    Text("An unexpected error occurred:")
+                    Text(errorMessage, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Stack Trace:")
+                    OutlinedTextField(
+                        value = stackTrace,
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
