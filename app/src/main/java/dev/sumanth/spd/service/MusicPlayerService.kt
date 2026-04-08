@@ -111,22 +111,22 @@ class MusicPlayerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val playPauseIcon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        val playPauseIcon = if (isPlaying) 0 else 0
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(artist)
             .setSubText("SPD Player")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(openAppIntent)
             .setOngoing(isPlaying)
             .setShowWhen(false)
             .setSilent(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(android.R.drawable.ic_media_previous, "Previous", prevIntent)
+            .addAction(0, "Previous", prevIntent)
             .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPauseIntent)
-            .addAction(android.R.drawable.ic_media_next, "Next", nextIntent)
-            .addAction(android.R.drawable.ic_delete, "Close", closeIntent)
+            .addAction(0, "Next", nextIntent)
+            .addAction(0, "Close", closeIntent)
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setShowActionsInCompactView(0, 1, 2)
