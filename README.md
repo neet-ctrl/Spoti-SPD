@@ -1,4 +1,4 @@
-# 🎵 Spotify Playlist Downloader
+# 🎵 Spotify Playlist{Song} Downloader
 
 <div align="center">
 
