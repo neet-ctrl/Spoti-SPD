@@ -428,7 +428,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                         totalTracks = 1,
                         successfulTracks = 1,
                         failedTracks = 0,
-                        filePath = path,
+                        filePath = downloadPath,
                         convertedToMp3 = convertToMp3,
                         status = DownloadStatus.COMPLETED
                     )

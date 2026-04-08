@@ -3,6 +3,7 @@ package dev.sumanth.spd.ui.screen
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -263,9 +264,12 @@ fun HistoryScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                     .fillMaxWidth()
                                     .clickable {
                                         try {
+                                            val file = java.io.File(item.filePath)
+                                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                                setDataAndType(android.net.Uri.parse("file://${item.filePath}"), "resource/folder")
+                                                setDataAndType(uri, "resource/folder")
                                                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
                                             context.startActivity(intent)
                                         } catch (e: Exception) {

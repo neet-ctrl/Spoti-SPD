@@ -2,6 +2,7 @@ package dev.sumanth.spd.ui.screen
 
 import android.content.Intent
 import android.os.Environment
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -710,20 +711,25 @@ fun DownloadDialog(viewModel: HomeScreenViewModel) {
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let {
-            val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(it, takeFlags)
+            try {
+                val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(it, takeFlags)
 
-            val segments = uri.path?.split(":")
-            if (segments != null && segments.size > 1) {
-                val folderPath = segments[1]
-                val storageBase = if (uri.path?.contains("primary") == true) {
-                    Environment.getExternalStorageDirectory().path
-                } else {
-                    "/storage/${segments[0].split("/").last()}"
+                val segments = uri.path?.split(":")
+                if (segments != null && segments.size > 1) {
+                    val folderPath = segments[1]
+                    val storageBase = if (uri.path?.contains("primary") == true) {
+                        Environment.getExternalStorageDirectory().path
+                    } else {
+                        "/storage/${segments[0].split("/").last()}"
+                    }
+
+                    downloadPath = "$storageBase/$folderPath"
+                    sharedPref.storeDownloadPath(downloadPath)
                 }
-
-                downloadPath = "$storageBase/$folderPath"
-                sharedPref.storeDownloadPath(downloadPath)
+            } catch (e: Exception) {
+                // Handle error, perhaps show toast
+                Toast.makeText(context, "Failed to set download path: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
