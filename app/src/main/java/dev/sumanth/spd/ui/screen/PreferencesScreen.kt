@@ -67,7 +67,7 @@ fun PreferencesScreen() {
     var autoUpdateCheck by remember { mutableStateOf(sharedPref.getAutoUpdateCheck()) }
 
     val uriHandler = LocalUriHandler.current
-    val githubUrl = "https://github.com/supersu-man/spotify-playlist-downloader"
+    val githubUrl = "https://github.com/Shakti-ctrl/spoti"
 
     val version = remember {
         try {
@@ -242,7 +242,7 @@ fun PreferencesScreen() {
                         icon = Icons.Filled.Person,
                         iconTint = MaterialTheme.colorScheme.tertiary,
                         title = "Developer",
-                        subtitle = "Sumanth",
+                        subtitle = "Shakti Kumar (Developer)",
                         showArrow = false,
                         onClick = {}
                     )
@@ -254,7 +254,7 @@ fun PreferencesScreen() {
                         icon = Icons.Filled.Code,
                         iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                         title = "View on GitHub",
-                        subtitle = "supersu-man/spotify-playlist-downloader",
+                        subtitle = "Shakti-ctrl/spoti",
                         showArrow = true,
                         onClick = { uriHandler.openUri(githubUrl) },
                         trailingIcon = Icons.AutoMirrored.Filled.Launch
