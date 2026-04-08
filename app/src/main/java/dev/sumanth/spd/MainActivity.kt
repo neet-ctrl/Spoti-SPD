@@ -7,8 +7,15 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -60,16 +67,16 @@ class MainActivity : ComponentActivity() {
 
         NewPipe.init(NewPipeDownloader.getInstance())
 
-        // Check for crash log
-        val crashSharedPref = getSharedPreferences("crash_log", MODE_PRIVATE)
-        val crashError = crashSharedPref.getString("error", null)
-        val crashStack = crashSharedPref.getString("stack", "") ?: ""
-        val hasCrash = crashError != null
-        if (hasCrash) {
-            crashSharedPref.edit().clear().apply()
-        }
-
         setContent {
+
+            // Check for crash log
+            val crashSharedPref = remember { getSharedPreferences("crash_log", MODE_PRIVATE) }
+            val crashError = remember { crashSharedPref.getString("error", null) }
+            val crashStack = remember { crashSharedPref.getString("stack", "") ?: "" }
+            val hasCrash = crashError != null
+            if (hasCrash) {
+                crashSharedPref.edit().clear().apply()
+            }
 
             val pagerState = rememberPagerState(pageCount = { navigationItems.size })
             val title by remember {
