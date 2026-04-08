@@ -1,23 +1,29 @@
 package dev.sumanth.spd.ui.screen
 
-import android.content.Intent
-import android.os.Environment
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,46 +31,56 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedButton
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,31 +88,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.border
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sumanth.spd.ui.component.SpotifyDialog
+import dev.sumanth.spd.ui.theme.SpotifyGreen
+import dev.sumanth.spd.ui.theme.SpotifyGreenLight
 import dev.sumanth.spd.ui.viewmodel.HomeScreenViewModel
-import dev.sumanth.spd.ui.viewmodel.Status
 import dev.sumanth.spd.ui.viewmodel.RepeatMode
-import dev.sumanth.spd.model.DownloadStatus
-import dev.sumanth.spd.model.Track
-import java.util.Locale
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
+import dev.sumanth.spd.ui.viewmodel.Status
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -109,308 +124,382 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
             SpotifyDialog(viewModel)
         }
 
-        // Download Dialog
         if (viewModel.showDownloadDialog) {
             DownloadDialog(viewModel)
         }
 
-        // Music Player (Floating)
-        if (viewModel.showPlayer) {
-            FloatingMusicPlayer(viewModel)
-        }
-
         Column(
             modifier = Modifier
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 80.dp)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = if (viewModel.showPlayer) 90.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            // ============= HEADER SECTION =============
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                shape = MaterialTheme.shapes.large
+            // ============= HERO GRADIENT BANNER =============
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                SpotifyGreen.copy(alpha = 0.25f),
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    )
+                    .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Column {
                     Text(
-                        "Spotify Downloads",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.primary
+                        "SPD",
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = SpotifyGreen
                     )
                     Text(
-                        "Add your Spotify link to get started",
+                        "Spotify Playlist Downloader",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // ============= INPUT CARD WITH PASTE =============
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
-                shape = MaterialTheme.shapes.large
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                // ============= LINK INPUT CARD =============
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    shape = RoundedCornerShape(20.dp),
+                    tonalElevation = 2.dp
                 ) {
-                    Text(
-                        "Paste Your Link",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "Spotify Link",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    // Input Field with Paste Button
-                    Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
                             value = viewModel.spotifyLink,
                             onValueChange = { viewModel.spotifyLink = it },
-                            label = { Text("Spotify Playlist / Album / Track") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp),
-                            minLines = 3,
+                            placeholder = { Text("Paste playlist, album, or track URL") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
                             maxLines = 4,
-                            shape = MaterialTheme.shapes.medium,
+                            shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                focusedBorderColor = SpotifyGreen,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                             )
                         )
-                    }
 
-                    // Paste Button
-                    FilledTonalButton(
-                        onClick = { viewModel.pasteFromClipboard() },
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Paste Button
+                            FilledTonalButton(
+                                onClick = { viewModel.pasteFromClipboard() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            ) {
+                                Icon(Icons.Filled.ContentPaste, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Paste")
+                            }
+
+                            // Convert to MP3 chip
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (viewModel.convertToMp3) SpotifyGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "MP3",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (viewModel.convertToMp3) SpotifyGreen else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Switch(
+                                        checked = viewModel.convertToMp3,
+                                        onCheckedChange = { viewModel.convertToMp3 = it },
+                                        modifier = Modifier.height(24.dp),
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = SpotifyGreen
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ============= ACTION BUTTONS =============
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { viewModel.startScraping() },
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = MaterialTheme.shapes.medium,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            .weight(1f)
+                            .height(50.dp),
+                        enabled = viewModel.appStatus != Status.SCRAPING,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
-                        Icon(
-                            Icons.Filled.ContentPaste,
-                            contentDescription = "Paste",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(end = 8.dp)
-                        )
-                        Text("Paste from Clipboard")
+                        if (viewModel.appStatus == Status.SCRAPING) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = SpotifyGreen
+                            )
+                        } else {
+                            Icon(Icons.Filled.PlaylistPlay, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Scrape", fontWeight = FontWeight.SemiBold)
+                        }
                     }
 
-                    // Convert to MP3 Toggle
+                    Button(
+                        onClick = { viewModel.downloadPlaylist() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        enabled = viewModel.appStatus == Status.SCRAPED,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SpotifyGreen,
+                            contentColor = Color.Black,
+                            disabledContainerColor = SpotifyGreen.copy(alpha = 0.3f),
+                            disabledContentColor = Color.Black.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        if (viewModel.appStatus == Status.DOWNLOADING) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.Black
+                            )
+                        } else {
+                            Icon(Icons.Filled.Download, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Download All", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // ============= DOWNLOAD PROGRESS =============
+                AnimatedVisibility(
+                    visible = viewModel.appStatus == Status.DOWNLOADING,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.medium
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Downloading...",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = SpotifyGreen
+                                )
+                                Text(
+                                    "${(viewModel.totalProgress * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = SpotifyGreen,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            LinearProgressIndicator(
+                                progress = { viewModel.totalProgress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = SpotifyGreen,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
+
+                            Text(
+                                viewModel.fileName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (viewModel.getFailedDownloadsCount() > 0) {
+                                    FilledTonalButton(
+                                        onClick = { viewModel.retryFailedDownloads() },
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Retry ${viewModel.getFailedDownloadsCount()} failed", fontSize = 12.sp)
+                                    }
+                                }
+                                TextButton(onClick = { viewModel.cancelDownload() }) {
+                                    Text("Cancel", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ============= SCRAPED STATUS BAR =============
+                AnimatedVisibility(
+                    visible = viewModel.appStatus == Status.SCRAPED,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = SpotifyGreen.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text(
-                                    "Convert to MP3",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.CheckCircle,
+                                    null,
+                                    tint = SpotifyGreen,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Text(
-                                    "Higher compatibility",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Column {
+                                    Text(
+                                        "Ready to Download",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = SpotifyGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "${viewModel.spotifyList.length()} songs found",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                            Switch(
-                                checked = viewModel.convertToMp3,
-                                onCheckedChange = { viewModel.convertToMp3 = it }
-                            )
+
+                            // Selection mode controls
+                            if (viewModel.isSelectionMode && viewModel.selectedSongs.isNotEmpty()) {
+                                FilledTonalButton(
+                                    onClick = { viewModel.downloadSelectedSongs() },
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = SpotifyGreen.copy(alpha = 0.2f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("${viewModel.selectedSongs.size} selected", color = SpotifyGreen, fontSize = 12.sp)
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            // ============= ACTION BUTTONS =============
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ElevatedButton(
-                    onClick = { viewModel.startScraping() },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize(),
-                    enabled = viewModel.appStatus != Status.SCRAPING,
-                    shape = MaterialTheme.shapes.medium,
-                    elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 6.dp)
+                // ============= SONGS LIST =============
+                AnimatedVisibility(
+                    visible = viewModel.appStatus == Status.SCRAPED && viewModel.spotifyList.length() > 0,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
                 ) {
-                    if (viewModel.appStatus == Status.SCRAPING) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        Text("Scrape")
-                    }
-                }
-                
-                ElevatedButton(
-                    onClick = { viewModel.downloadPlaylist() },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize(),
-                    enabled = viewModel.appStatus == Status.SCRAPED,
-                    shape = MaterialTheme.shapes.medium,
-                    elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 6.dp),
-                    colors = ButtonDefaults.elevatedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    )
-                ) {
-                    if (viewModel.appStatus == Status.DOWNLOADING) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onSecondary
-                        )
-                    } else {
-                        Text("Download All")
-                    }
-                }
-            }
-
-            // ============= SUCCESS ANIMATION =============
-            AnimatedVisibility(
-                visible = viewModel.appStatus == Status.SCRAPED,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Surface(
-                            modifier = Modifier.size(32.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Text("✓", color = MaterialTheme.colorScheme.onPrimary)
-                            }
-                        }
-                        Column {
-                            Text(
-                                "Ready to Download",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "${viewModel.spotifyList.length()} songs found",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ============= SONGS LIST =============
-            AnimatedVisibility(
-                visible = viewModel.appStatus == Status.SCRAPED && viewModel.spotifyList.length() > 0,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        // Header with selection controls
+                        // List header
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
+                                .padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 "Songs (${viewModel.spotifyList.length()})",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                fontWeight = FontWeight.Bold
                             )
-
-                            if (viewModel.isSelectionMode) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (viewModel.isSelectionMode) {
                                     TextButton(onClick = { viewModel.selectAllSongs() }) {
-                                        Text("Select All")
+                                        Text("All", fontSize = 12.sp, color = SpotifyGreen)
                                     }
                                     TextButton(onClick = { viewModel.clearSelection() }) {
-                                        Text("Cancel")
-                                    }
-                                    if (viewModel.selectedSongs.isNotEmpty()) {
-                                        FilledTonalButton(onClick = { viewModel.downloadSelectedSongs() }) {
-                                            Text("Download (${viewModel.selectedSongs.size})")
-                                        }
+                                        Text("Cancel", fontSize = 12.sp)
                                     }
                                 }
                             }
                         }
 
-                        // Songs list
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 400.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .heightIn(max = 500.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             itemsIndexed((0 until viewModel.spotifyList.length()).toList()) { index, _ ->
                                 val track = viewModel.spotifyList.getJSONObject(index)
                                 val title = track.getString("title")
                                 val artist = track.getString("artist")
                                 val isSelected = viewModel.selectedSongs.contains(index)
+                                val isCurrentlyPlaying = viewModel.currentPlayingIndex == index && viewModel.showPlayer
 
                                 var offsetX by remember { mutableStateOf(0f) }
 
-                                Card(
+                                Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp)
                                         .offset { IntOffset(offsetX.roundToInt(), 0) }
                                         .pointerInput(Unit) {
                                             detectHorizontalDragGestures(
                                                 onDragEnd = {
                                                     when {
-                                                        offsetX > 100 -> {
-                                                            // Swipe right - select
-                                                            viewModel.toggleSongSelection(index)
-                                                        }
-                                                        offsetX < -100 -> {
-                                                            // Swipe left - download
-                                                            viewModel.downloadSongAtIndex(index)
-                                                        }
+                                                        offsetX > 100 -> viewModel.toggleSongSelection(index)
+                                                        offsetX < -100 -> viewModel.downloadSongAtIndex(index)
                                                     }
                                                     offsetX = 0f
                                                 },
@@ -420,12 +509,12 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                                 }
                                             )
                                         },
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected)
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        else
-                                            MaterialTheme.colorScheme.surface
-                                    )
+                                    color = when {
+                                        isCurrentlyPlaying -> SpotifyGreen.copy(alpha = 0.12f)
+                                        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                        else -> MaterialTheme.colorScheme.surfaceContainer
+                                    },
+                                    shape = RoundedCornerShape(14.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -437,24 +526,51 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                                     }
                                                 },
                                                 onLongClick = {
+                                                    if (!viewModel.isSelectionMode) viewModel.enterSelectionMode()
                                                     viewModel.toggleSongSelection(index)
-                                                    if (!viewModel.isSelectionMode) {
-                                                        viewModel.enterSelectionMode()
-                                                    }
                                                 }
                                             )
                                             .padding(12.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
+                                        // Track number / album art placeholder
+                                        Box(
+                                            modifier = Modifier
+                                                .size(42.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(
+                                                    if (isCurrentlyPlaying) SpotifyGreen.copy(alpha = 0.3f)
+                                                    else MaterialTheme.colorScheme.surfaceContainerHigh
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isCurrentlyPlaying && viewModel.isPlaying) {
+                                                Icon(
+                                                    Icons.Filled.MusicNote,
+                                                    null,
+                                                    tint = SpotifyGreen,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            } else {
+                                                Text(
+                                                    "${index + 1}",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
                                         // Song info
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 title,
                                                 style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Medium,
+                                                fontWeight = if (isCurrentlyPlaying) FontWeight.Bold else FontWeight.SemiBold,
                                                 maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                overflow = TextOverflow.Ellipsis,
+                                                color = if (isCurrentlyPlaying) SpotifyGreen else MaterialTheme.colorScheme.onSurface
                                             )
                                             Text(
                                                 artist,
@@ -465,26 +581,38 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                             )
                                         }
 
-                                        // Controls
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            if (viewModel.isSelectionMode) {
-                                                Checkbox(
-                                                    checked = isSelected,
-                                                    onCheckedChange = { viewModel.toggleSongSelection(index) }
+                                        // Action icons
+                                        if (viewModel.isSelectionMode) {
+                                            Checkbox(
+                                                checked = isSelected,
+                                                onCheckedChange = { viewModel.toggleSongSelection(index) },
+                                                colors = CheckboxDefaults.colors(
+                                                    checkedColor = SpotifyGreen,
+                                                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
-                                            } else {
+                                            )
+                                        } else {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                                                 IconButton(
                                                     onClick = { viewModel.playSongAtIndex(index) },
-                                                    modifier = Modifier.size(32.dp)
+                                                    modifier = Modifier.size(36.dp)
                                                 ) {
                                                     Icon(
-                                                        Icons.Filled.PlayArrow,
-                                                        contentDescription = "Play",
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(16.dp)
+                                                        if (isCurrentlyPlaying && viewModel.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                        null,
+                                                        tint = if (isCurrentlyPlaying) SpotifyGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { viewModel.downloadSongAtIndex(index) },
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Filled.Download,
+                                                        null,
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(18.dp)
                                                     )
                                                 }
                                             }
@@ -493,517 +621,147 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
                                 }
                             }
                         }
-
-                        // Bottom padding
-                        Box(modifier = Modifier.height(16.dp))
                     }
                 }
-            }
 
-            // ============= PROGRESS CARDS =============
-            AnimatedVisibility(
-                visible = viewModel.totalProgress > 0f,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
-                    shape = MaterialTheme.shapes.large
+                // ============= COMPLETED STATUS =============
+                AnimatedVisibility(
+                    visible = viewModel.appStatus == Status.COMPLETED,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = SpotifyGreen.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        // Header
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                if (viewModel.totalProgress == 1f) "Complete!" 
-                                else "Downloading...",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            if (viewModel.appStatus == Status.DOWNLOADING) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            }
-                        }
-
-                        // Current File
-                        if (viewModel.totalProgress < 1f) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    viewModel.fileName,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                LinearProgressIndicator(
-                                    progress = viewModel.fileProgress,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp),
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    trackColor = MaterialTheme.colorScheme.secondaryContainer
-                                )
-                                Text(
-                                    String.format(Locale.ENGLISH, "%.0f%%", viewModel.fileProgress * 100),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-
-                        // Overall Progress
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    "Overall Progress",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    "${(viewModel.spotifyList.length() * viewModel.totalProgress).toInt()}/${viewModel.spotifyList.length()}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Icon(Icons.Filled.CheckCircle, null, tint = SpotifyGreen, modifier = Modifier.size(22.dp))
+                                Column {
+                                    Text("Download Complete!", style = MaterialTheme.typography.titleSmall, color = SpotifyGreen, fontWeight = FontWeight.Bold)
+                                    if (viewModel.getFailedDownloadsCount() > 0) {
+                                        Text(
+                                            "${viewModel.getFailedDownloadsCount()} songs failed",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
                             }
-                            LinearProgressIndicator(
-                                progress = viewModel.totalProgress,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                            Text(
-                                String.format(Locale.ENGLISH, "%.1f%%", viewModel.totalProgress * 100),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.End
-                            )
-                        }
-
-                        // Destination location
-                        if (viewModel.currentDownload != null) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        // Open file location
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                            setDataAndType(android.net.Uri.parse("file://${viewModel.currentDownload?.filePath}"), "resource/folder")
-                                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
-                                        context.startActivity(intent)
-                                    },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Filled.Folder,
-                                    contentDescription = "Location",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    " ${viewModel.currentDownload?.filePath}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-
-                        // Cancel Button
-                        if (viewModel.appStatus == Status.DOWNLOADING) {
-                            FilledTonalButton(
-                                onClick = { viewModel.cancelDownload() },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Cancel Download")
+                            if (viewModel.getFailedDownloadsCount() > 0) {
+                                FilledTonalButton(
+                                    onClick = { viewModel.retryFailedDownloads() },
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Retry Failed", fontSize = 12.sp)
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // ============= FAILED DOWNLOADS CARD =============
-            AnimatedVisibility(
-                visible = viewModel.failedTracks.isNotEmpty(),
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
-                    shape = MaterialTheme.shapes.large,
-                    colors = CardDefaults.elevatedCardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Filled.Error,
-                                contentDescription = "Error",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Download Issues",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                Text(
-                                    "${viewModel.getFailedDownloadsCount()} songs failed to download",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-
-                        FilledTonalButton(
-                            onClick = { viewModel.retryFailedDownloads() },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                Icons.Filled.Refresh,
-                                contentDescription = "Retry",
-                                modifier = Modifier.size(16.dp).padding(end = 8.dp)
-                            )
-                            Text("Retry Failed Downloads")
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
+        }
+
+        // ============= FLOATING MUSIC PLAYER =============
+        if (viewModel.showPlayer) {
+            FloatingMusicPlayer(viewModel)
         }
     }
 }
 
 @Composable
 fun DownloadDialog(viewModel: HomeScreenViewModel) {
-    val context = LocalContext.current
-    val sharedPref = remember { dev.sumanth.spd.utils.SharedPref(context) }
-    var downloadPath by remember { mutableStateOf(sharedPref.getDownloadPath()) }
-    var isExpanded by remember { mutableStateOf(false) }
-    var showFullPath by remember { mutableStateOf(false) }
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        uri?.let {
-            try {
-                val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(it, takeFlags)
-
-                val segments = uri.path?.split(":")
-                if (segments != null && segments.size > 1) {
-                    val folderPath = segments[1]
-                    val storageBase = if (uri.path?.contains("primary") == true) {
-                        Environment.getExternalStorageDirectory().path
-                    } else {
-                        "/storage/${segments[0].split("/").last()}"
-                    }
-
-                    downloadPath = "$storageBase/$folderPath"
-                    sharedPref.storeDownloadPath(downloadPath)
-                }
-            } catch (e: Exception) {
-                // Handle error, perhaps show toast
-                Toast.makeText(context, "Failed to set download path: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = { viewModel.showDownloadDialog = false },
-        title = { Text("Download Options") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Location section
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("Download Location:", style = MaterialTheme.typography.labelMedium)
-                        
-                        // Path display
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp)
-                                    .heightIn(max = if (showFullPath) 120.dp else 40.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (showFullPath) {
-                                    Text(
-                                        downloadPath,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                } else {
-                                    Text(
-                                        downloadPath,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            TextButton(onClick = { showFullPath = !showFullPath }) {
-                                Text(if (showFullPath) "Hide Path" else "Show Full Path")
-                            }
-                            Button(onClick = { launcher.launch(null) }) {
-                                Text("Change Location")
-                            }
-                        }
-                    }
-                }
-
-                // Selected songs count
-                Text(
-                    "${viewModel.selectedSongs.size} songs selected",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                // Expandable song list
-                if (isExpanded) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 150.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            items(viewModel.selectedSongs.sorted().size) { index ->
-                                val songIndex = viewModel.selectedSongs.sorted()[index]
-                                if (songIndex in 0 until viewModel.spotifyList.length()) {
-                                    val track = viewModel.spotifyList.getJSONObject(songIndex)
-                                    val title = track.getString("title")
-                                    val artist = track.getString("artist")
-                                    Text(
-                                        "${index + 1}. $title - $artist",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                TextButton(onClick = { isExpanded = !isExpanded }) {
-                    Text(if (isExpanded) "Collapse Songs" else "Show All Songs (${viewModel.selectedSongs.size})")
-                }
-            }
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = {
-                    // Download individually
-                    viewModel.selectedSongs.forEach { index ->
-                        viewModel.downloadSongAtIndex(index)
-                    }
-                    viewModel.clearSelection()
-                    viewModel.showDownloadDialog = false
-                }) {
-                    Text("Download Each")
-                }
-                Button(onClick = {
-                    // Download as ZIP
-                    viewModel.downloadSelectedSongsAsZip()
-                }) {
-                    Text("Download as ZIP")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = { viewModel.showDownloadDialog = false }) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
-    val currentSong = viewModel.getCurrentSong()
-
-    if (currentSong == null || viewModel.currentPlayingIndex < 0) {
-        // Auto-close if no song to play
-        viewModel.closePlayer()
-        return
-    }
-
     Dialog(
-        onDismissRequest = { viewModel.closePlayer() },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true
-        )
+        onDismissRequest = { viewModel.showDownloadDialog = false },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth(0.92f)
                 .padding(16.dp),
-            shape = MaterialTheme.shapes.large,
+            shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
+            tonalElevation = 6.dp
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Song Counter
                 Text(
-                    "Now Playing ${viewModel.currentPlayingIndex + 1} of ${viewModel.spotifyList.length()}",
-                    style = MaterialTheme.typography.labelMedium,
+                    "Download ${viewModel.selectedSongs.size} Songs",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    "Choose how to download selected songs:",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Song info
-                Column(
+                // Individual files
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .clickable {
+                            viewModel.showDownloadDialog = false
+                            viewModel.downloadPlaylist()
+                        },
+                    shape = RoundedCornerShape(14.dp),
+                    color = SpotifyGreen.copy(alpha = 0.12f)
                 ) {
-                    Text(
-                        currentSong.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        currentSong.artist,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // Progress bar placeholder
-                LinearProgressIndicator(
-                    progress = 0.3f,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                )
-
-                // Controls
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    IconButton(onClick = { viewModel.previousSong() }, modifier = Modifier.weight(1f)) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Previous",
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-
-                    FloatingActionButton(
-                        onClick = { viewModel.togglePlayPause() },
-                        modifier = Modifier.size(64.dp)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            if (viewModel.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (viewModel.isPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-
-                    IconButton(onClick = { viewModel.nextSong() }, modifier = Modifier.weight(1f)) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Next",
-                            modifier = Modifier.size(32.dp)
-                        )
+                        Icon(Icons.Filled.Download, null, tint = SpotifyGreen, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Download Individually", fontWeight = FontWeight.SemiBold, color = SpotifyGreen)
+                            Text("Save each song as a separate file", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
 
-                // Shuffle toggle
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
+                // ZIP archive
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.toggleShuffle() }
-                        .padding(8.dp)
+                        .clickable {
+                            viewModel.downloadSelectedSongsAsZip()
+                        },
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer
                 ) {
-                    Icon(
-                        Icons.Filled.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (viewModel.isShuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        if (viewModel.isShuffleMode) "Shuffle ON" else "Shuffle OFF",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (viewModel.isShuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Archive, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Download as ZIP", fontWeight = FontWeight.SemiBold)
+                            Text("Compress all songs into one archive", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
 
-                // Close button
-                Button(
-                    onClick = { viewModel.closePlayer() },
-                    modifier = Modifier.fillMaxWidth()
+                TextButton(
+                    onClick = { viewModel.showDownloadDialog = false },
+                    modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("Close Player")
+                    Text("Cancel")
                 }
             }
         }
@@ -1013,177 +771,318 @@ fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
 @Composable
 fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
-        val maxHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
-        val collapsedHeight = 80.dp
-        val expandedHeight = 260.dp
-        val playerWidth = 340.dp
-        val playerHeight = if (viewModel.isPlayerCollapsed) collapsedHeight else expandedHeight
-        val playerWidthPx = with(LocalDensity.current) { playerWidth.toPx() }
-        val playerHeightPx = with(LocalDensity.current) { playerHeight.toPx() }
-        val maxOffsetX = max(0f, maxWidthPx - playerWidthPx)
+        val density = LocalDensity.current
+        val maxWidthPx = with(density) { maxWidth.toPx() }
+        val maxHeightPx = with(density) { maxHeight.toPx() }
+        val playerHeight = if (viewModel.isPlayerCollapsed) 72.dp else 280.dp
+        val playerHeightPx = with(density) { playerHeight.toPx() }
         val maxOffsetY = max(0f, maxHeightPx - playerHeightPx)
-        val snapThreshold = with(LocalDensity.current) { 40.dp.toPx() }
 
+        // Bottom mini player or expanded player
         Box(
             modifier = Modifier
-                .offset {
-                    IntOffset(
-                        viewModel.playerOffsetX.roundToInt().coerceIn(0, maxOffsetX.roundToInt()),
-                        viewModel.playerOffsetY.roundToInt().coerceIn(0, maxOffsetY.roundToInt())
-                    )
-                }
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .zIndex(10f)
         ) {
             Surface(
                 modifier = Modifier
-                    .size(playerWidth, playerHeight)
-                    .clip(MaterialTheme.shapes.large)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(2.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
-                    .zIndex(10f)
-                    .clickable {
-                        if (viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
-                    },
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 16.dp,
-                shadowElevation = 8.dp
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 20.dp,
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                    )
+                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 8.dp
             ) {
                 Column {
+                    // Drag handle
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(24.dp)
-                            .pointerInput(viewModel.playerOffsetX, viewModel.playerOffsetY) {
-                                detectDragGestures(
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        val nextX = viewModel.playerOffsetX + dragAmount.x
-                                        val nextY = viewModel.playerOffsetY + dragAmount.y
-                                        viewModel.updatePlayerPosition(
-                                            nextX.coerceIn(0f, maxOffsetX),
-                                            nextY.coerceIn(0f, maxOffsetY)
+                            .clickable { viewModel.togglePlayerCollapse() }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(36.dp)
+                                .height(4.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        )
+                    }
+
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        // Song info row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                // Album art placeholder
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            Brush.linearGradient(
+                                                colors = listOf(SpotifyGreen, SpotifyGreenLight)
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.MusicNote,
+                                        null,
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        viewModel.getCurrentSong()?.title ?: "No song selected",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        viewModel.getCurrentSong()?.artist ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(onClick = { viewModel.toggleFavorite() }, modifier = Modifier.size(36.dp)) {
+                                    Icon(
+                                        if (viewModel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                        null,
+                                        tint = if (viewModel.isFavorite) Color(0xFFE91E63) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(onClick = { viewModel.closePlayer() }, modifier = Modifier.size(36.dp)) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = !viewModel.isPlayerCollapsed,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(bottom = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                if (viewModel.isPlayerLoading) {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .clip(RoundedCornerShape(1.dp)),
+                                        color = SpotifyGreen,
+                                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                                    )
+                                }
+
+                                // Progress time labels
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        viewModel.currentTime.toInt().let { "%d:%02d".format(it / 60, it % 60) },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        viewModel.duration.toInt().let { "%d:%02d".format(it / 60, it % 60) },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                // Seek bar
+                                Slider(
+                                    value = viewModel.currentTime.coerceIn(0f, viewModel.duration),
+                                    onValueChange = { viewModel.seekTo(it) },
+                                    valueRange = 0f..viewModel.duration.coerceAtLeast(1f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(24.dp),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = SpotifyGreen,
+                                        activeTrackColor = SpotifyGreen,
+                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                                    )
+                                )
+
+                                // Controls row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Shuffle
+                                    IconButton(onClick = { viewModel.toggleShuffle() }, modifier = Modifier.size(40.dp)) {
+                                        Icon(
+                                            Icons.Filled.Shuffle,
+                                            null,
+                                            tint = if (viewModel.isShuffleMode) SpotifyGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
                                         )
-                                    },
-                                    onDragEnd = {
-                                        val x = viewModel.playerOffsetX
-                                        if (x <= snapThreshold) {
-                                            viewModel.updatePlayerPosition(0f, viewModel.playerOffsetY)
-                                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
-                                        } else if (x >= maxWidthPx - playerWidthPx - snapThreshold) {
-                                            viewModel.updatePlayerPosition(maxWidthPx - playerWidthPx, viewModel.playerOffsetY)
-                                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                                    }
+
+                                    // Previous
+                                    IconButton(onClick = { viewModel.previousSong() }, modifier = Modifier.size(44.dp)) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowBack,
+                                            null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(26.dp)
+                                        )
+                                    }
+
+                                    // Play/Pause button
+                                    Box(
+                                        modifier = Modifier
+                                            .size(58.dp)
+                                            .clip(CircleShape)
+                                            .background(SpotifyGreen)
+                                            .clickable { viewModel.togglePlayPause() },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (viewModel.isPlayerLoading) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(28.dp),
+                                                color = Color.Black,
+                                                strokeWidth = 3.dp
+                                            )
+                                        } else {
+                                            Icon(
+                                                if (viewModel.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                null,
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(30.dp)
+                                            )
                                         }
                                     }
-                                )
-                            }
-                    ) {
-                        Text(
-                            "⋮⋮",
-                            modifier = Modifier.align(Alignment.Center),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                viewModel.getCurrentSong()?.title ?: "No song selected",
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                viewModel.getCurrentSong()?.artist ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            IconButton(onClick = { viewModel.toggleRepeatMode() }) {
-                                Icon(
-                                    Icons.Filled.Shuffle,
-                                    contentDescription = "Repeat",
-                                    tint = if (viewModel.repeatMode != RepeatMode.NONE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(onClick = { viewModel.togglePlayerCollapse() }) {
-                                Icon(
-                                    Icons.Filled.MoreVert,
-                                    contentDescription = "Collapse",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
 
-                    if (!viewModel.isPlayerCollapsed) {
-                        if (viewModel.isPlayerLoading) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                    // Next
+                                    IconButton(onClick = { viewModel.nextSong() }, modifier = Modifier.size(44.dp)) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowForward,
+                                            null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(26.dp)
+                                        )
+                                    }
+
+                                    // Repeat
+                                    IconButton(onClick = { viewModel.toggleRepeatMode() }, modifier = Modifier.size(40.dp)) {
+                                        Icon(
+                                            when (viewModel.repeatMode) {
+                                                RepeatMode.ONE -> Icons.Filled.RepeatOne
+                                                else -> Icons.Filled.Repeat
+                                            },
+                                            null,
+                                            tint = if (viewModel.repeatMode != RepeatMode.NONE) SpotifyGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                // Volume row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.VolumeDown,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Slider(
+                                        value = viewModel.volume,
+                                        onValueChange = { viewModel.setVolume(it) },
+                                        modifier = Modifier.weight(1f).height(20.dp),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = MaterialTheme.colorScheme.onSurface,
+                                            activeTrackColor = MaterialTheme.colorScheme.onSurface,
+                                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                                        )
+                                    )
+                                    Icon(
+                                        Icons.Filled.VolumeUp,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        // Mini player collapsed controls
+                        AnimatedVisibility(
+                            visible = viewModel.isPlayerCollapsed,
+                            enter = fadeIn(),
+                            exit = fadeOut()
                         ) {
-                            Text(
-                                viewModel.currentTime.toInt().let { "%02d:%02d".format(it / 60, it % 60) },
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                viewModel.duration.toInt().let { "%02d:%02d".format(it / 60, it % 60) },
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-
-                        Slider(
-                            value = viewModel.currentTime.coerceIn(0f, viewModel.duration),
-                            onValueChange = { viewModel.seekTo(it) },
-                            valueRange = 0f..viewModel.duration.coerceAtLeast(1f),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = { viewModel.previousSong() }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous")
-                            }
-                            FloatingActionButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(58.dp)) {
-                                Icon(
-                                    if (viewModel.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = if (viewModel.isPlaying) "Pause" else "Play"
-                                )
-                            }
-                            IconButton(onClick = { viewModel.nextSong() }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next")
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = { viewModel.setVolume((viewModel.volume - 0.1f).coerceIn(0f, 1f)) }) {
-                                Text("Vol -")
-                            }
-                            TextButton(onClick = { viewModel.setVolume((viewModel.volume + 0.1f).coerceIn(0f, 1f)) }) {
-                                Text("Vol +")
-                            }
-                            TextButton(onClick = { viewModel.closePlayer() }) {
-                                Text("Close")
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(onClick = { viewModel.previousSong() }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(20.dp))
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(SpotifyGreen)
+                                        .clickable { viewModel.togglePlayPause() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        if (viewModel.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                        null,
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(onClick = { viewModel.nextSong() }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(20.dp))
+                                }
                             }
                         }
                     }
@@ -1191,5 +1090,4 @@ fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
             }
         }
     }
-}
 }

@@ -1,9 +1,13 @@
 package dev.sumanth.spd.ui.viewmodel
 
 import android.app.Application
+import android.content.BroadcastReceiver
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -14,6 +18,7 @@ import androidx.lifecycle.viewModelScope
 import dev.sumanth.spd.model.DownloadHistoryItem
 import dev.sumanth.spd.model.DownloadStatus
 import dev.sumanth.spd.model.Track
+import dev.sumanth.spd.service.MusicPlayerService
 import dev.sumanth.spd.utils.DownloadHistoryManager
 import dev.sumanth.spd.utils.DownloadManager
 import dev.sumanth.spd.utils.SharedPref
@@ -36,6 +41,7 @@ enum class Status {
 enum class RepeatMode {
     NONE, ONE, ALL
 }
+
 class HomeScreenViewModel(application: Application) : AndroidViewModel(application) {
 
     var fileProgress by mutableFloatStateOf(0f)
@@ -47,11 +53,10 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     private val sharedPref = SharedPref(application)
     private val historyManager = DownloadHistoryManager(application)
     private var downloadJob: Job? = null
-    
+
     var downloadHistory by mutableStateOf(listOf<DownloadHistoryItem>())
     var currentDownload by mutableStateOf<DownloadHistoryItem?>(null)
-    
-    // New state for enhanced UI
+
     var selectedSongs by mutableStateOf(setOf<Int>())
     var isSelectionMode by mutableStateOf(false)
     var showDownloadDialog by mutableStateOf(false)
@@ -61,12 +66,11 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     var isPlaying by mutableStateOf(false)
     var isPlayerLoading by mutableStateOf(false)
 
-    // Media Player state
     var currentTime by mutableFloatStateOf(0f)
     var duration by mutableFloatStateOf(0f)
     private var _volume by mutableFloatStateOf(1f)
     val volume: Float get() = _volume
-    var repeatMode by mutableStateOf(RepeatMode.NONE) // NONE, ONE, ALL
+    var repeatMode by mutableStateOf(RepeatMode.NONE)
     var isPlayerCollapsed by mutableStateOf(false)
     var playerOffsetX by mutableFloatStateOf(0f)
     var playerOffsetY by mutableFloatStateOf(0f)
@@ -74,17 +78,65 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     private var mediaPlayer: android.media.MediaPlayer? = null
     private var playbackJob: Job? = null
-    
-    private fun sanitizeFilename(name: String): String {
-        return name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
-    }
-    
+
     val failedTracks = mutableListOf<Track>()
     var appStatus by mutableStateOf(Status.IDLE)
     var spotifyList by mutableStateOf(JSONArray())
 
+    // Broadcast receiver for notification button actions
+    private val notificationActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                MusicPlayerService.ACTION_PLAY_PAUSE -> togglePlayPause()
+                MusicPlayerService.ACTION_NEXT -> nextSong()
+                MusicPlayerService.ACTION_PREV -> previousSong()
+                MusicPlayerService.ACTION_CLOSE -> closePlayer()
+            }
+        }
+    }
+
     init {
         loadHistory()
+        registerNotificationReceiver()
+    }
+
+    private fun registerNotificationReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(MusicPlayerService.ACTION_PLAY_PAUSE)
+            addAction(MusicPlayerService.ACTION_NEXT)
+            addAction(MusicPlayerService.ACTION_PREV)
+            addAction(MusicPlayerService.ACTION_CLOSE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getApplication<Application>().registerReceiver(notificationActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            getApplication<Application>().registerReceiver(notificationActionReceiver, filter)
+        }
+    }
+
+    private fun updateMusicNotification() {
+        val song = getCurrentSong() ?: return
+        val intent = MusicPlayerService.buildUpdateIntent(
+            getApplication(),
+            song.title,
+            song.artist,
+            isPlaying
+        )
+        getApplication<Application>().startService(intent)
+    }
+
+    private fun stopMusicService() {
+        try {
+            getApplication<Application>().stopService(
+                Intent(getApplication(), MusicPlayerService::class.java)
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun sanitizeFilename(name: String): String {
+        return name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
     }
 
     fun loadHistory() {
@@ -135,14 +187,13 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun downloadPlaylist() {
-        if(spotifyList.length() == 0) return Toast.makeText(getApplication(), "Playlist is empty.", Toast.LENGTH_SHORT).show()
+        if (spotifyList.length() == 0) return Toast.makeText(getApplication(), "Playlist is empty.", Toast.LENGTH_SHORT).show()
         downloadJob = viewModelScope.launch {
             appStatus = Status.DOWNLOADING
             failedTracks.clear()
             try {
                 val downloadPath = sharedPref.getDownloadPath()
-                
-                // Create history item
+
                 currentDownload = DownloadHistoryItem(
                     spotifyUrl = spotifyLink,
                     title = "Downloading...",
@@ -181,8 +232,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                         failedTracks.add(Track(trackName, artist))
                     }
                 }
-                
-                // Save to history
+
                 currentDownload?.let { download ->
                     historyManager.addHistory(
                         download.copy(
@@ -207,7 +257,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         fileName = "Download cancelled"
         totalProgress = 0f
     }
-    
+
     fun retryFailedDownloads() {
         downloadJob = viewModelScope.launch {
             appStatus = Status.DOWNLOADING
@@ -245,20 +295,19 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
-    
+
     fun getFailedDownloadsCount(): Int = failedTracks.size
-    
+
     fun deleteHistoryItem(id: String) {
         historyManager.deleteHistory(id)
         loadHistory()
     }
-    
+
     fun clearHistory() {
         historyManager.clearAllHistory()
         loadHistory()
     }
-    
-    // New methods for enhanced UI
+
     fun toggleSongSelection(index: Int) {
         if (isSelectionMode) {
             selectedSongs = if (selectedSongs.contains(index)) {
@@ -274,64 +323,63 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             selectedSongs = setOf(index)
         }
     }
-    
+
     fun selectAllSongs() {
         selectedSongs = (0 until spotifyList.length()).toSet()
         isSelectionMode = true
     }
-    
+
     fun clearSelection() {
         selectedSongs = emptySet()
         isSelectionMode = false
     }
-    
+
     fun enterSelectionMode() {
         isSelectionMode = true
     }
-    
+
     fun downloadSelectedSongs() {
         if (selectedSongs.isNotEmpty()) {
             showDownloadDialog = true
         }
     }
-    
+
     fun downloadSelectedSongsAsZip() {
         if (selectedSongs.isEmpty()) return
-        
+
         viewModelScope.launch {
             try {
                 appStatus = Status.DOWNLOADING
                 val downloadPath = sharedPref.getDownloadPath()
                 val tempDir = File("$downloadPath/temp_zip_${System.currentTimeMillis()}")
                 tempDir.mkdirs()
-                
+
                 val downloadedFiles = mutableListOf<File>()
                 var successfulDownloads = 0
                 var failedDownloads = 0
-                
-                // Download all selected songs to temp directory
+
                 selectedSongs.sorted().forEachIndexed { index, songIndex ->
                     if (songIndex in 0 until spotifyList.length()) {
                         val track = spotifyList.getJSONObject(songIndex)
                         val trackName = track.getString("title")
                         val artist = track.getString("artist")
-                        
+
                         try {
                             fileName = "Downloading ${index + 1}/${selectedSongs.size}: $trackName"
-                            totalProgress = (index.toFloat() / selectedSongs.size) * 0.9f // 90% for downloads
-                            
+                            totalProgress = (index.toFloat() / selectedSongs.size) * 0.9f
+
                             val fileMeta = withContext(Dispatchers.IO) {
                                 DownloadManager.getFileMeta(trackName, artist)
                             }
-                            
+
                             val sanitizedName = sanitizeFilename(trackName)
                             val tempPath = "${tempDir.absolutePath}/$sanitizedName"
-                            
+
                             withContext(Dispatchers.IO) {
                                 DownloadManager.downloadFile(fileMeta.url, "$tempPath.${fileMeta.extention}") { b, c ->
                                     fileProgress = (b * 100 / c).toFloat() / 100
                                 }
-                                
+
                                 if (convertToMp3) {
                                     DownloadManager.convertToMp3(tempPath, fileMeta.extention, trackName, artist)
                                     downloadedFiles.add(File("$tempPath.mp3"))
@@ -340,7 +388,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                                     downloadedFiles.add(File("$tempPath.${fileMeta.extention}"))
                                 }
                             }
-                            
+
                             successfulDownloads++
                         } catch (e: Exception) {
                             failedDownloads++
@@ -348,22 +396,19 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                         }
                     }
                 }
-                
-                // Create ZIP file
+
                 fileName = "Creating ZIP archive..."
                 totalProgress = 0.95f
-                
+
                 val zipFileName = "Spotify_Download_${System.currentTimeMillis()}.zip"
                 val zipPath = "$downloadPath/$zipFileName"
-                
+
                 withContext(Dispatchers.IO) {
                     DownloadManager.createZipFile(downloadedFiles, zipPath)
                 }
-                
-                // Clean up temp files
+
                 tempDir.deleteRecursively()
-                
-                // Add to history
+
                 val historyItem = DownloadHistoryItem(
                     spotifyUrl = spotifyLink,
                     title = "ZIP Archive: ${selectedSongs.size} songs",
@@ -377,15 +422,15 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 )
                 historyManager.addHistory(historyItem)
                 loadHistory()
-                
+
                 totalProgress = 1f
                 appStatus = Status.SCRAPED
-                
+
                 clearSelection()
                 showDownloadDialog = false
-                
+
                 Toast.makeText(getApplication(), "ZIP created: $zipFileName", Toast.LENGTH_LONG).show()
-                
+
             } catch (e: Exception) {
                 e.printStackTrace()
                 appStatus = Status.SCRAPED
@@ -393,13 +438,13 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
-    
+
     fun downloadSongAtIndex(index: Int) {
         if (index in 0 until spotifyList.length()) {
             val track = spotifyList.getJSONObject(index)
             val trackName = track.getString("title")
             val artist = track.getString("artist")
-            
+
             viewModelScope.launch {
                 try {
                     val downloadPath = sharedPref.getDownloadPath()
@@ -408,7 +453,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     }
                     fileName = "Downloading $trackName"
                     val path = "$downloadPath/${sanitizeFilename(trackName)}"
-                    
+
                     withContext(Dispatchers.IO) {
                         DownloadManager.downloadFile(fileMeta.url, "$path.${fileMeta.extention}") { b, c ->
                             fileProgress = (b * 100 / c).toFloat() / 100
@@ -419,8 +464,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                             DownloadManager.tagFile(path, fileMeta.extention, trackName, artist)
                         }
                     }
-                    
-                    // Add to history
+
                     val historyItem = DownloadHistoryItem(
                         spotifyUrl = spotifyLink,
                         title = trackName,
@@ -434,7 +478,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     )
                     historyManager.addHistory(historyItem)
                     loadHistory()
-                    
+
                     Toast.makeText(getApplication(), "Downloaded: $trackName", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     Toast.makeText(getApplication(), "Download failed: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -442,7 +486,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
-    
+
     fun playSongAtIndex(index: Int) {
         if (index !in 0 until spotifyList.length()) return
         if (currentPlayingIndex == index && mediaPlayer != null) {
@@ -480,6 +524,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                             this@HomeScreenViewModel.isPlaying = true
                             mp.start()
                             this@HomeScreenViewModel.startPlaybackProgressUpdater()
+                            this@HomeScreenViewModel.updateMusicNotification()
                         }
                         setOnCompletionListener {
                             when (this@HomeScreenViewModel.repeatMode) {
@@ -490,6 +535,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                                 RepeatMode.ALL -> this@HomeScreenViewModel.nextSong()
                                 else -> {
                                     this@HomeScreenViewModel.isPlaying = false
+                                    this@HomeScreenViewModel.updateMusicNotification()
                                 }
                             }
                         }
@@ -517,7 +563,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
-    
+
     fun togglePlayPause() {
         mediaPlayer?.let { player ->
             if (player.isPlaying) {
@@ -528,9 +574,10 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 isPlaying = true
                 startPlaybackProgressUpdater()
             }
+            updateMusicNotification()
         }
     }
-    
+
     fun nextSong() {
         val nextIndex = when {
             isShuffleMode -> (0 until spotifyList.length()).random()
@@ -540,7 +587,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
         playSongAtIndex(nextIndex)
     }
-    
+
     fun previousSong() {
         val previousIndex = when {
             currentPlayingIndex > 0 -> currentPlayingIndex - 1
@@ -549,19 +596,20 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
         playSongAtIndex(previousIndex)
     }
-    
+
     fun toggleShuffle() {
         isShuffleMode = !isShuffleMode
     }
-    
+
     fun closePlayer() {
         showPlayer = false
         isPlaying = false
         currentPlayingIndex = -1
         playbackJob?.cancel()
         mediaPlayer?.pause()
+        stopMusicService()
     }
-    
+
     fun getCurrentSong(): Track? {
         if (currentPlayingIndex in 0 until spotifyList.length()) {
             val track = spotifyList.getJSONObject(currentPlayingIndex)
@@ -569,18 +617,17 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
         return null
     }
-    
-    // Media Player Controls
+
     fun seekTo(positionSeconds: Float) {
         currentTime = positionSeconds.coerceIn(0f, duration)
         mediaPlayer?.seekTo((currentTime * 1000).toInt())
     }
-    
+
     fun setVolume(newVolume: Float) {
         _volume = newVolume.coerceIn(0f, 1f)
         mediaPlayer?.setVolume(_volume, _volume)
     }
-    
+
     fun toggleRepeatMode() {
         repeatMode = when (repeatMode) {
             RepeatMode.NONE -> RepeatMode.ALL
@@ -588,27 +635,32 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             RepeatMode.ONE -> RepeatMode.NONE
         }
     }
-    
+
     fun toggleFavorite() {
         isFavorite = !isFavorite
     }
-    
+
     fun togglePlayerCollapse() {
         isPlayerCollapsed = !isPlayerCollapsed
     }
-    
+
     fun resetPlayerPosition() {
         playerOffsetX = 0f
         playerOffsetY = 0f
     }
-    
+
     fun updatePlayerPosition(x: Float, y: Float) {
         playerOffsetX = x
         playerOffsetY = y
     }
-    
+
     override fun onCleared() {
         super.onCleared()
+        try {
+            getApplication<Application>().unregisterReceiver(notificationActionReceiver)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         playbackJob?.cancel()
         mediaPlayer?.release()
         mediaPlayer = null

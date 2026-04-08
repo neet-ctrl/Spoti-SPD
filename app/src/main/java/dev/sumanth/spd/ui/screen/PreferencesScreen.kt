@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,17 +18,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Launch
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,10 +45,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.sumanth.spd.ui.theme.SpotifyGreen
+import dev.sumanth.spd.ui.theme.SpotifyGreenLight
 import dev.sumanth.spd.utils.SharedPref
 
 @Composable
@@ -55,9 +72,9 @@ fun PreferencesScreen() {
     val version = remember {
         try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            "Version ${packageInfo.versionName}"
+            packageInfo.versionName ?: "N/A"
         } catch (e: Exception) {
-            "Version N/A"
+            "N/A"
         }
     }
 
@@ -74,7 +91,6 @@ fun PreferencesScreen() {
                 } else {
                     "/storage/${segments[0].split("/").last()}"
                 }
-
                 downloadPath = "$storageBase/$folderPath"
                 sharedPref.storeDownloadPath(downloadPath)
             }
@@ -83,187 +99,298 @@ fun PreferencesScreen() {
 
     Column(
         modifier = Modifier
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 80.dp)
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-            shape = MaterialTheme.shapes.large
+        // ============= HERO BANNER =============
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            SpotifyGreen.copy(alpha = 0.2f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+                .padding(20.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     "Settings",
                     style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    "Customize your preferences",
+                    "Customize your experience",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        Text("General Settings", style = MaterialTheme.typography.titleLarge)
-
-        ElevatedCard(
-            onClick = { launcher.launch(null) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // ============= STORAGE SECTION =============
+            SettingsSectionHeader(icon = Icons.Filled.Storage, title = "Storage")
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
-                Text("Download Location", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    text = downloadPath,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Text(
-                        text = "Tap to change folder",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(8.dp),
-                        fontWeight = FontWeight.Medium
+                Column {
+                    SettingsItem(
+                        icon = Icons.Filled.Folder,
+                        iconTint = SpotifyGreen,
+                        title = "Download Location",
+                        subtitle = downloadPath,
+                        subtitleMaxLines = 2,
+                        showArrow = true,
+                        onClick = { launcher.launch(null) }
                     )
                 }
             }
-        }
 
-        Text("Updates", style = MaterialTheme.typography.titleLarge)
+            // ============= UPDATES SECTION =============
+            SettingsSectionHeader(icon = Icons.Filled.Update, title = "Updates")
 
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Auto-check for updates", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Check for new versions automatically",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column {
+                    SettingsSwitchItem(
+                        icon = Icons.Filled.Notifications,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        title = "Auto-check for Updates",
+                        subtitle = "Check for new versions on launch",
+                        checked = autoUpdateCheck,
+                        onCheckedChange = {
+                            autoUpdateCheck = it
+                            sharedPref.storeAutoUpdateCheck(it)
+                        }
                     )
                 }
-                Switch(
-                    checked = autoUpdateCheck,
-                    onCheckedChange = {
-                        autoUpdateCheck = it
-                        sharedPref.storeAutoUpdateCheck(it)
+            }
+
+            // ============= ABOUT SECTION =============
+            SettingsSectionHeader(icon = Icons.Filled.Info, title = "About")
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer
+            ) {
+                Column {
+                    // App version
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(SpotifyGreen, SpotifyGreenLight)
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.AutoAwesome,
+                                    null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "SPD — Spotify Playlist Downloader",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "Version $version",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
-                )
+
+                    SettingsDivider()
+
+                    // Developer
+                    SettingsItem(
+                        icon = Icons.Filled.Person,
+                        iconTint = MaterialTheme.colorScheme.tertiary,
+                        title = "Developer",
+                        subtitle = "Sumanth",
+                        showArrow = false,
+                        onClick = {}
+                    )
+
+                    SettingsDivider()
+
+                    // GitHub
+                    SettingsItem(
+                        icon = Icons.Filled.Code,
+                        iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        title = "View on GitHub",
+                        subtitle = "supersu-man/spotify-playlist-downloader",
+                        showArrow = true,
+                        onClick = { uriHandler.openUri(githubUrl) },
+                        trailingIcon = Icons.AutoMirrored.Filled.Launch
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun SettingsSectionHeader(icon: ImageVector, title: String) {
+    Row(
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            icon,
+            null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+fun SettingsDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(0.5.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    )
+}
+
+@Composable
+fun SettingsItem(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    showArrow: Boolean = true,
+    onClick: () -> Unit,
+    trailingIcon: ImageVector? = null,
+    subtitleMaxLines: Int = 1
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
         }
 
-        Text("About", style = MaterialTheme.typography.titleLarge)
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = subtitleMaxLines,
+                overflow = TextOverflow.Ellipsis
             )
+        }
+
+        if (trailingIcon != null) {
+            Icon(trailingIcon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+        } else if (showArrow) {
+            Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+fun SettingsSwitchItem(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(version, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    "Spotify Playlist Downloader",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
         }
 
-        ElevatedCard(
-            onClick = { uriHandler.openUri(githubUrl) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("View on GitHub", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        "supersu-man/spotify-playlist-downloader",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Icon(
-                    Icons.AutoMirrored.Filled.Launch,
-                    contentDescription = "Open GitHub",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
-        Box(modifier = Modifier.height(16.dp))
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, contentDescription = "Developer", modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Developed by Sumanth", style = MaterialTheme.typography.bodyLarge)
-                }
-                Row(
-                    modifier = Modifier.clickable { uriHandler.openUri(githubUrl) },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Source Code on GitHub",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        Icons.AutoMirrored.Filled.Launch,
-                        contentDescription = "Open Link",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                Text(
-                    text = version,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = SpotifyGreen
+            )
+        )
     }
 }
