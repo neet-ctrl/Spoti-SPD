@@ -14,12 +14,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,6 +63,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +74,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,13 +85,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sumanth.spd.ui.component.SpotifyDialog
 import dev.sumanth.spd.ui.viewmodel.HomeScreenViewModel
 import dev.sumanth.spd.ui.viewmodel.Status
+import dev.sumanth.spd.ui.viewmodel.RepeatMode
 import dev.sumanth.spd.model.DownloadStatus
 import dev.sumanth.spd.model.Track
 import java.util.Locale
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
@@ -104,9 +110,9 @@ fun HomeScreen(viewModel: HomeScreenViewModel = viewModel()) {
             DownloadDialog(viewModel)
         }
 
-        // Music Player
+        // Music Player (Floating)
         if (viewModel.showPlayer) {
-            MusicPlayerDialog(viewModel)
+            FloatingMusicPlayer(viewModel)
         }
 
         Column(
@@ -989,6 +995,170 @@ fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Close Player")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FloatingMusicPlayer(viewModel: HomeScreenViewModel) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
+        val maxHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
+        val collapsedHeight = 80.dp
+        val expandedHeight = 260.dp
+        val playerWidth = 340.dp
+        val playerHeight = if (viewModel.isPlayerCollapsed) collapsedHeight else expandedHeight
+        val playerWidthPx = with(LocalDensity.current) { playerWidth.toPx() }
+        val playerHeightPx = with(LocalDensity.current) { playerHeight.toPx() }
+        val maxOffsetX = max(0f, maxWidthPx - playerWidthPx)
+        val maxOffsetY = max(0f, maxHeightPx - playerHeightPx)
+        val snapThreshold = with(LocalDensity.current) { 40.dp.toPx() }
+
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        viewModel.playerOffsetX.roundToInt().coerceIn(0, maxOffsetX.roundToInt()),
+                        viewModel.playerOffsetY.roundToInt().coerceIn(0, maxOffsetY.roundToInt())
+                    )
+                }
+                .pointerInput(viewModel.playerOffsetX, viewModel.playerOffsetY) {
+                    detectVerticalDragGestures(onDrag = { change, dragAmount ->
+                        change.consume()
+                        val nextX = viewModel.playerOffsetX + dragAmount.x
+                        val nextY = viewModel.playerOffsetY + dragAmount.y
+                        viewModel.updatePlayerPosition(
+                            nextX.coerceIn(0f, maxOffsetX),
+                            nextY.coerceIn(0f, maxOffsetY)
+                        )
+                    }, onDragEnd = {
+                        val x = viewModel.playerOffsetX
+                        if (x <= snapThreshold) {
+                            viewModel.updatePlayerPosition(0f, viewModel.playerOffsetY)
+                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                        } else if (x >= maxWidthPx - playerWidthPx - snapThreshold) {
+                            viewModel.updatePlayerPosition(maxWidthPx - playerWidthPx, viewModel.playerOffsetY)
+                            if (!viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                        }
+                    })
+        ) {
+            Surface(
+                modifier = Modifier
+                    .size(playerWidth, playerHeight)
+                    .clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable {
+                        if (viewModel.isPlayerCollapsed) viewModel.togglePlayerCollapse()
+                    },
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 16.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                viewModel.getCurrentSong()?.title ?: "No song selected",
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                viewModel.getCurrentSong()?.artist ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(onClick = { viewModel.toggleRepeatMode() }) {
+                                Icon(
+                                    Icons.Filled.Shuffle,
+                                    contentDescription = "Repeat",
+                                    tint = if (viewModel.repeatMode != RepeatMode.NONE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { viewModel.togglePlayerCollapse() }) {
+                                Icon(
+                                    Icons.Filled.MoreVert,
+                                    contentDescription = "Collapse",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    if (!viewModel.isPlayerCollapsed) {
+                        if (viewModel.isPlayerLoading) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                viewModel.currentTime.toInt().let { "%02d:%02d".format(it / 60, it % 60) },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                viewModel.duration.toInt().let { "%02d:%02d".format(it / 60, it % 60) },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                        Slider(
+                            value = viewModel.currentTime.coerceIn(0f, viewModel.duration),
+                            onValueChange = { viewModel.seekTo(it) },
+                            valueRange = 0f..viewModel.duration.coerceAtLeast(1f),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { viewModel.previousSong() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous")
+                            }
+                            FloatingActionButton(onClick = { viewModel.togglePlayPause() }, modifier = Modifier.size(58.dp)) {
+                                Icon(
+                                    if (viewModel.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = if (viewModel.isPlaying) "Pause" else "Play"
+                                )
+                            }
+                            IconButton(onClick = { viewModel.nextSong() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next")
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { viewModel.setVolume((viewModel.volume - 0.1f).coerceIn(0f, 1f)) }) {
+                                Text("Vol -")
+                            }
+                            TextButton(onClick = { viewModel.setVolume((viewModel.volume + 0.1f).coerceIn(0f, 1f)) }) {
+                                Text("Vol +")
+                            }
+                            TextButton(onClick = { viewModel.closePlayer() }) {
+                                Text("Close")
+                            }
+                        }
+                    }
                 }
             }
         }

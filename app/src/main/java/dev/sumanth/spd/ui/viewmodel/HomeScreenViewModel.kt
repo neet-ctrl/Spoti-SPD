@@ -32,6 +32,10 @@ enum class Status {
     RETRYING,
     COMPLETED,
 }
+
+enum class RepeatMode {
+    NONE, ONE, ALL
+}
 class HomeScreenViewModel(application: Application) : AndroidViewModel(application) {
 
     var fileProgress by mutableFloatStateOf(0f)
@@ -55,6 +59,20 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     var currentPlayingIndex by mutableStateOf(-1)
     var isShuffleMode by mutableStateOf(false)
     var isPlaying by mutableStateOf(false)
+    var isPlayerLoading by mutableStateOf(false)
+
+    // Media Player state
+    var currentTime by mutableFloatStateOf(0f)
+    var duration by mutableFloatStateOf(0f)
+    var volume by mutableFloatStateOf(1f)
+    var repeatMode by mutableStateOf(RepeatMode.NONE) // NONE, ONE, ALL
+    var isPlayerCollapsed by mutableStateOf(false)
+    var playerOffsetX by mutableFloatStateOf(0f)
+    var playerOffsetY by mutableFloatStateOf(0f)
+    var isFavorite by mutableStateOf(false)
+
+    private var mediaPlayer: android.media.MediaPlayer? = null
+    private var playbackJob: Job? = null
     
     private fun sanitizeFilename(name: String): String {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
@@ -425,31 +443,110 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
     
     fun playSongAtIndex(index: Int) {
+        if (index !in 0 until spotifyList.length()) return
+        if (currentPlayingIndex == index && mediaPlayer != null) {
+            togglePlayPause()
+            return
+        }
+
         currentPlayingIndex = index
         showPlayer = true
-        isPlaying = true
+        isPlaying = false
+        isPlayerLoading = true
+        currentTime = 0f
+        duration = 0f
+
+        playbackJob?.cancel()
+        viewModelScope.launch {
+            try {
+                val track = spotifyList.getJSONObject(index)
+                val trackName = track.getString("title")
+                val artist = track.getString("artist")
+
+                val fileMeta = withContext(Dispatchers.IO) {
+                    DownloadManager.getFileMeta(trackName, artist)
+                }
+
+                withContext(Dispatchers.Main) {
+                    mediaPlayer?.release()
+                    mediaPlayer = android.media.MediaPlayer().apply {
+                        setDataSource(fileMeta.url)
+                        setVolume(volume, volume)
+                        setOnPreparedListener { mp ->
+                            duration = mp.duration / 1000f
+                            currentTime = 0f
+                            isPlayerLoading = false
+                            isPlaying = true
+                            mp.start()
+                            startPlaybackProgressUpdater()
+                        }
+                        setOnCompletionListener {
+                            when (repeatMode) {
+                                RepeatMode.ONE -> {
+                                    it.seekTo(0)
+                                    it.start()
+                                }
+                                RepeatMode.ALL -> nextSong()
+                                else -> {
+                                    isPlaying = false
+                                }
+                            }
+                        }
+                        prepareAsync()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                isPlayerLoading = false
+                isPlaying = false
+                Toast.makeText(getApplication(), "Player error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun startPlaybackProgressUpdater() {
+        playbackJob?.cancel()
+        playbackJob = viewModelScope.launch {
+            while (mediaPlayer != null && isPlaying) {
+                mediaPlayer?.let { mp ->
+                    currentTime = mp.currentPosition / 1000f
+                    duration = if (mp.duration > 0) mp.duration / 1000f else duration
+                }
+                kotlinx.coroutines.delay(500)
+            }
+        }
     }
     
     fun togglePlayPause() {
-        isPlaying = !isPlaying
+        mediaPlayer?.let { player ->
+            if (player.isPlaying) {
+                player.pause()
+                isPlaying = false
+            } else {
+                player.start()
+                isPlaying = true
+                startPlaybackProgressUpdater()
+            }
+        }
     }
     
     fun nextSong() {
-        if (currentPlayingIndex < spotifyList.length() - 1) {
-            currentPlayingIndex++
-        } else if (isShuffleMode) {
-            currentPlayingIndex = (0 until spotifyList.length()).random()
-        } else {
-            currentPlayingIndex = 0
+        val nextIndex = when {
+            isShuffleMode -> (0 until spotifyList.length()).random()
+            currentPlayingIndex < spotifyList.length() - 1 -> currentPlayingIndex + 1
+            repeatMode == RepeatMode.ALL -> 0
+            else -> return
         }
+        playSongAtIndex(nextIndex)
     }
     
     fun previousSong() {
-        if (currentPlayingIndex > 0) {
-            currentPlayingIndex--
-        } else {
-            currentPlayingIndex = spotifyList.length() - 1
+        val previousIndex = when {
+            currentPlayingIndex > 0 -> currentPlayingIndex - 1
+            repeatMode == RepeatMode.ALL -> spotifyList.length() - 1
+            else -> return
         }
+        playSongAtIndex(previousIndex)
     }
     
     fun toggleShuffle() {
@@ -460,6 +557,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         showPlayer = false
         isPlaying = false
         currentPlayingIndex = -1
+        playbackJob?.cancel()
+        mediaPlayer?.pause()
     }
     
     fun getCurrentSong(): Track? {
@@ -468,5 +567,49 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             return Track(track.getString("title"), track.getString("artist"))
         }
         return null
+    }
+    
+    // Media Player Controls
+    fun seekTo(positionSeconds: Float) {
+        currentTime = positionSeconds.coerceIn(0f, duration)
+        mediaPlayer?.seekTo((currentTime * 1000).toInt())
+    }
+    
+    fun setVolume(newVolume: Float) {
+        volume = newVolume.coerceIn(0f, 1f)
+        mediaPlayer?.setVolume(volume, volume)
+    }
+    
+    fun toggleRepeatMode() {
+        repeatMode = when (repeatMode) {
+            RepeatMode.NONE -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.NONE
+        }
+    }
+    
+    fun toggleFavorite() {
+        isFavorite = !isFavorite
+    }
+    
+    fun togglePlayerCollapse() {
+        isPlayerCollapsed = !isPlayerCollapsed
+    }
+    
+    fun resetPlayerPosition() {
+        playerOffsetX = 0f
+        playerOffsetY = 0f
+    }
+    
+    fun updatePlayerPosition(x: Float, y: Float) {
+        playerOffsetX = x
+        playerOffsetY = y
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        playbackJob?.cancel()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 }
