@@ -859,6 +859,12 @@ fun DownloadDialog(viewModel: HomeScreenViewModel) {
 fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
     val currentSong = viewModel.getCurrentSong()
 
+    if (currentSong == null || viewModel.currentPlayingIndex < 0) {
+        // Auto-close if no song to play
+        viewModel.closePlayer()
+        return
+    }
+
     Dialog(
         onDismissRequest = { viewModel.closePlayer() },
         properties = DialogProperties(
@@ -869,7 +875,7 @@ fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.9f)
                 .padding(16.dp),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
@@ -880,27 +886,53 @@ fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Song Counter
+                Text(
+                    "Now Playing ${viewModel.currentPlayingIndex + 1} of ${viewModel.spotifyList.length()}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 // Song info
-                if (currentSong != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
                         currentSong.title,
                         style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         currentSong.artist,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                // Progress bar placeholder
+                LinearProgressIndicator(
+                    progress = 0.3f,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                )
 
                 // Controls
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    IconButton(onClick = { viewModel.previousSong() }) {
+                    IconButton(onClick = { viewModel.previousSong() }, modifier = Modifier.weight(1f)) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Previous",
@@ -919,7 +951,7 @@ fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
                         )
                     }
 
-                    IconButton(onClick = { viewModel.nextSong() }) {
+                    IconButton(onClick = { viewModel.nextSong() }, modifier = Modifier.weight(1f)) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = "Next",
@@ -931,15 +963,20 @@ fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
                 // Shuffle toggle
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { viewModel.toggleShuffle() }
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.toggleShuffle() }
+                        .padding(8.dp)
                 ) {
                     Icon(
                         Icons.Filled.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (viewModel.isShuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (viewModel.isShuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        "Shuffle",
+                        if (viewModel.isShuffleMode) "Shuffle ON" else "Shuffle OFF",
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (viewModel.isShuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 8.dp)
@@ -947,7 +984,10 @@ fun MusicPlayerDialog(viewModel: HomeScreenViewModel) {
                 }
 
                 // Close button
-                TextButton(onClick = { viewModel.closePlayer() }) {
+                Button(
+                    onClick = { viewModel.closePlayer() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Close Player")
                 }
             }
