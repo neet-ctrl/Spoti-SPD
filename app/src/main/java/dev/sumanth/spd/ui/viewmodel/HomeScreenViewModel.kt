@@ -763,6 +763,25 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         duration = 0f
 
         val item = localPlaybackList[index]
+        
+        // Validate file before attempting playback
+        val file = java.io.File(item.filePath)
+        if (!file.exists()) {
+            Toast.makeText(getApplication(), "File not found: ${item.title}", Toast.LENGTH_LONG).show()
+            isPlayerLoading = false
+            return
+        }
+        if (!file.canRead()) {
+            Toast.makeText(getApplication(), "Cannot read file: ${item.title}", Toast.LENGTH_LONG).show()
+            isPlayerLoading = false
+            return
+        }
+        if (file.length() == 0L) {
+            Toast.makeText(getApplication(), "Empty file: ${item.title}", Toast.LENGTH_LONG).show()
+            isPlayerLoading = false
+            return
+        }
+        
         playbackJob?.cancel()
         viewModelScope.launch {
             try {
@@ -789,28 +808,56 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     
                     mediaPlayer?.release()
                     mediaPlayer = android.media.MediaPlayer().apply {
-                        setDataSource(item.filePath)
-                        setVolume(volume, volume)
-                        setOnPreparedListener { mp ->
-                            this@HomeScreenViewModel.duration = mp.duration / 1000f
-                            this@HomeScreenViewModel.currentTime = 0f
-                            this@HomeScreenViewModel.isPlayerLoading = false
-                            this@HomeScreenViewModel.isPlaying = true
-                            mp.start()
-                            this@HomeScreenViewModel.startPlaybackProgressUpdater()
-                            this@HomeScreenViewModel.updateMusicNotification()
-                        }
-                        setOnCompletionListener {
-                            when (this@HomeScreenViewModel.repeatMode) {
-                                RepeatMode.ONE -> { it.seekTo(0); it.start() }
-                                RepeatMode.ALL -> this@HomeScreenViewModel.nextSong()
-                                else -> {
-                                    this@HomeScreenViewModel.isPlaying = false
-                                    this@HomeScreenViewModel.updateMusicNotification()
+                        try {
+                            setDataSource(item.filePath)
+                            setVolume(volume, volume)
+                            setOnPreparedListener { mp ->
+                                this@HomeScreenViewModel.duration = mp.duration / 1000f
+                                this@HomeScreenViewModel.currentTime = 0f
+                                this@HomeScreenViewModel.isPlayerLoading = false
+                                this@HomeScreenViewModel.isPlaying = true
+                                mp.start()
+                                this@HomeScreenViewModel.startPlaybackProgressUpdater()
+                                this@HomeScreenViewModel.updateMusicNotification()
+                            }
+                            setOnCompletionListener {
+                                when (this@HomeScreenViewModel.repeatMode) {
+                                    RepeatMode.ONE -> { it.seekTo(0); it.start() }
+                                    RepeatMode.ALL -> this@HomeScreenViewModel.nextSong()
+                                    else -> {
+                                        this@HomeScreenViewModel.isPlaying = false
+                                        this@HomeScreenViewModel.updateMusicNotification()
+                                    }
                                 }
                             }
+                            setOnErrorListener { mp, what, extra ->
+                                // Log the error and show user-friendly message
+                                val errorMsg = when (what) {
+                                    android.media.MediaPlayer.MEDIA_ERROR_UNKNOWN -> "Unknown media error"
+                                    android.media.MediaPlayer.MEDIA_ERROR_SERVER_DIED -> "Media server died"
+                                    else -> "Media error: $what"
+                                }
+                                android.util.Log.e("MusicPlayer", "MediaPlayer error: $errorMsg (extra: $extra) for file: ${item.filePath}")
+                                Toast.makeText(getApplication(), "Cannot play ${item.title}: $errorMsg", Toast.LENGTH_LONG).show()
+                                this@HomeScreenViewModel.isPlayerLoading = false
+                                this@HomeScreenViewModel.isPlaying = false
+                                mp.release()
+                                true // Return true to indicate we handled the error
+                            }
+                            prepareAsync()
+                        } catch (e: Exception) {
+                            android.util.Log.e("MusicPlayer", "Failed to setup MediaPlayer for ${item.filePath}", e)
+                            val errorMsg = when (e) {
+                                is java.io.FileNotFoundException -> "File not found"
+                                is java.io.IOException -> "Cannot access file"
+                                is IllegalArgumentException -> "Invalid file format"
+                                is SecurityException -> "Permission denied"
+                                else -> "Playback error: ${e.message}"
+                            }
+                            Toast.makeText(getApplication(), "Cannot play ${item.title}: $errorMsg", Toast.LENGTH_LONG).show()
+                            isPlayerLoading = false
+                            isPlaying = false
                         }
-                        prepareAsync()
                     }
                 }
             } catch (e: Exception) {

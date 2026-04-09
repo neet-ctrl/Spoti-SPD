@@ -114,10 +114,8 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         }
 
         private fun buildRefreshIntent(context: Context): PendingIntent {
-            val intent = Intent(context, MusicPlayerWidgetProvider::class.java).apply {
-                action = ACTION_REFRESH_LIBRARY
-            }
-            return PendingIntent.getBroadcast(
+            val intent = Intent(context, LibraryRefreshService::class.java)
+            return PendingIntent.getService(
                 context,
                 0,
                 intent,
@@ -171,11 +169,6 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         when (intent.action) {
-            ACTION_REFRESH_LIBRARY -> {
-                context?.let {
-                    buildOpenLibraryIntent(it, true).send()
-                }
-            }
             ACTION_OPEN_LIBRARY -> {
                 context?.let {
                     buildOpenLibraryIntent(it, false).send()
