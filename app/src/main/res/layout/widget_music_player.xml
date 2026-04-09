@@ -61,19 +61,19 @@
         android:gravity="center_vertical"
         android:paddingBottom="8dp">
 
-        <Box
+        <FrameLayout
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:padding="6dp">
+            android:background="@drawable/widget_ctrl_btn_bg">
 
             <ImageView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:src="@drawable/ic_music_note_widget"
                 android:tint="#1DB954"
+                android:padding="6dp"
                 android:contentDescription="Current song icon" />
-        </Box>
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="0dp"
