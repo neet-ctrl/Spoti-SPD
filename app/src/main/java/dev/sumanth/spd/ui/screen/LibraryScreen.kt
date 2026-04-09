@@ -1,5 +1,9 @@
 package dev.sumanth.spd.ui.screen
 
+import android.content.Intent
+import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -334,7 +338,6 @@ fun LibraryScreen(
     }
 }
 
-@Composable
 @Composable
 private fun LibraryHeader(
     songCount: Int,
@@ -957,7 +960,6 @@ private fun LibraryEmptyState(onScan: () -> Unit) {
     }
 }
 
-@Composable
 @Composable
 private fun SortBottomSheet(
     currentOrder: LibrarySortOrder,
