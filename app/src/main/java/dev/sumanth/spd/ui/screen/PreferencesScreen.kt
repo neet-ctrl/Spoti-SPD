@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Update
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import dev.sumanth.spd.ui.theme.SpotifyGreen
 import dev.sumanth.spd.ui.theme.SpotifyGreenLight
 import dev.sumanth.spd.utils.SharedPref
+import dev.sumanth.spd.utils.WidgetLogger
 
 @Composable
 fun PreferencesScreen() {
@@ -176,6 +178,52 @@ fun PreferencesScreen() {
                         onCheckedChange = {
                             autoUpdateCheck = it
                             sharedPref.storeAutoUpdateCheck(it)
+                        }
+                    )
+                }
+            }
+
+            // ============= WIDGET DEBUG SECTION =============
+            SettingsSectionHeader(icon = Icons.Filled.Code, title = "Widget Debug")
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer
+            ) {
+                Column {
+                    val widgetLogger = remember { WidgetLogger(context) }
+                    val logs = remember { widgetLogger.getLogs() }
+
+                    SettingsItem(
+                        icon = Icons.Filled.Code,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        title = "Widget Debug Logs",
+                        subtitle = "${logs.size} entries • Tap to view",
+                        showArrow = true,
+                        onClick = {
+                            // Show logs in a dialog or navigate to a log screen
+                            val logText = widgetLogger.getLogsAsString()
+                            // For now, we'll just copy to clipboard
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Widget Debug Logs", logText))
+                            // Show toast
+                            android.widget.Toast.makeText(context, "Widget logs copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    )
+
+                    SettingsDivider()
+
+                    SettingsItem(
+                        icon = Icons.Filled.Delete,
+                        iconTint = MaterialTheme.colorScheme.error,
+                        title = "Clear Widget Logs",
+                        subtitle = "Remove all debug log entries",
+                        showArrow = false,
+                        onClick = {
+                            widgetLogger.clearLogs()
+                            // Show toast
+                            android.widget.Toast.makeText(context, "Widget logs cleared", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     )
                 }

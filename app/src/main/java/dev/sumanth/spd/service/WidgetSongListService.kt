@@ -5,6 +5,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import dev.sumanth.spd.R
+import dev.sumanth.spd.utils.WidgetLogger
 import org.json.JSONArray
 
 class WidgetSongListService : RemoteViewsService() {
@@ -17,6 +18,8 @@ class WidgetSongListFactory(
     private val context: Context,
     private val intent: Intent? = null
 ) : RemoteViewsService.RemoteViewsFactory {
+
+    private val logger = WidgetLogger(context)
 
     companion object {
         const val PREFS_NAME = "widget_song_list_prefs"
@@ -61,18 +64,22 @@ class WidgetSongListFactory(
     private var isEmpty = true
 
     override fun onCreate() {
+        logger.logInfo("WidgetSongListFactory onCreate called")
         loadData()
     }
 
     override fun onDataSetChanged() {
+        logger.logInfo("WidgetSongListFactory onDataSetChanged called")
         loadData()
     }
 
     override fun onDestroy() {
+        logger.logInfo("WidgetSongListFactory onDestroy called")
         songs.clear()
     }
 
     private fun loadData() {
+        logger.logDebug("WidgetSongListFactory loadData called")
         songs.clear()
         try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -80,6 +87,7 @@ class WidgetSongListFactory(
             val jsonStr = prefs.getString(KEY_SONGS_JSON, null)
             if (jsonStr.isNullOrBlank()) {
                 isEmpty = true
+                logger.logInfo("No songs data found in preferences")
                 return
             }
             val arr = JSONArray(jsonStr)
@@ -95,12 +103,20 @@ class WidgetSongListFactory(
                             index = i
                         )
                     )
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    logger.logWarn("Failed to parse song at index $i", mapOf("error" to e.message))
+                }
             }
             isEmpty = songs.isEmpty()
+            logger.logInfo("Loaded songs data", mapOf(
+                "songCount" to songs.size,
+                "currentIndex" to currentIndex,
+                "isEmpty" to isEmpty
+            ))
         } catch (e: Exception) {
             isEmpty = true
             saveLastError(context, "Load error: ${e.message?.take(80)}")
+            logger.logError("Failed to load songs data", e)
         }
     }
 
@@ -115,16 +131,27 @@ class WidgetSongListFactory(
     override fun getLoadingView(): RemoteViews? = null
 
     override fun getViewAt(position: Int): RemoteViews {
+        logger.logDebug("getViewAt called", mapOf("position" to position, "isEmpty" to isEmpty, "songsSize" to songs.size))
         if (isEmpty) {
+            logger.logDebug("Returning placeholder view (empty)")
             return buildPlaceholderView()
         }
         if (position < 0 || position >= songs.size) {
+            logger.logWarn("Invalid position requested", mapOf("position" to position, "songsSize" to songs.size))
             return buildPlaceholderView()
         }
         return try {
-            buildSongView(songs[position], position == currentIndex)
+            val song = songs[position]
+            val isPlaying = position == currentIndex
+            logger.logDebug("Building song view", mapOf(
+                "position" to position,
+                "title" to song.title,
+                "isPlaying" to isPlaying
+            ))
+            buildSongView(song, isPlaying)
         } catch (e: Exception) {
             saveLastError(context, "View error: ${e.message?.take(80)}")
+            logger.logError("Failed to build song view", e, mapOf("position" to position))
             buildPlaceholderView()
         }
     }

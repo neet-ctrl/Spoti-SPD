@@ -10,6 +10,7 @@ import android.net.Uri
 import android.widget.RemoteViews
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
+import dev.sumanth.spd.utils.WidgetLogger
 
 class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
@@ -43,21 +44,35 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         }
 
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val title = prefs.getString(KEY_TITLE, "No song selected") ?: "No song selected"
-            val artist = prefs.getString(KEY_ARTIST, "") ?: ""
-            val currentTime = prefs.getFloat(KEY_CURRENT_TIME, 0f)
-            val duration = prefs.getFloat(KEY_DURATION, 0f)
-            val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
-            val isLoading = prefs.getBoolean(KEY_IS_LOADING, false)
-            val isShuffle = prefs.getBoolean(KEY_IS_SHUFFLE, false)
-            val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
-            val isFavorite = prefs.getBoolean(KEY_IS_FAVORITE, false)
-            val songCount = prefs.getInt(KEY_SONG_COUNT, 0)
-            val speed = prefs.getFloat(KEY_SPEED, 1f)
-            val volume = prefs.getFloat(KEY_VOLUME, 1f)
-            val songPos = prefs.getInt(KEY_SONG_POSITION, -1)
-            val songTotal = prefs.getInt(KEY_SONG_TOTAL, 0)
+            val logger = WidgetLogger(context)
+            logger.logDebug("Starting widget update", mapOf("appWidgetId" to appWidgetId))
+
+            try {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val title = prefs.getString(KEY_TITLE, "No song selected") ?: "No song selected"
+                val artist = prefs.getString(KEY_ARTIST, "") ?: ""
+                val currentTime = prefs.getFloat(KEY_CURRENT_TIME, 0f)
+                val duration = prefs.getFloat(KEY_DURATION, 0f)
+                val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
+                val isLoading = prefs.getBoolean(KEY_IS_LOADING, false)
+                val isShuffle = prefs.getBoolean(KEY_IS_SHUFFLE, false)
+                val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
+                val isFavorite = prefs.getBoolean(KEY_IS_FAVORITE, false)
+                val songCount = prefs.getInt(KEY_SONG_COUNT, 0)
+                val speed = prefs.getFloat(KEY_SPEED, 1f)
+                val volume = prefs.getFloat(KEY_VOLUME, 1f)
+                val songPos = prefs.getInt(KEY_SONG_POSITION, -1)
+                val songTotal = prefs.getInt(KEY_SONG_TOTAL, 0)
+
+                logger.logDebug("Loaded widget state", mapOf(
+                    "title" to title,
+                    "artist" to artist,
+                    "isPlaying" to isPlaying,
+                    "isLoading" to isLoading,
+                    "songCount" to songCount,
+                    "songPos" to songPos,
+                    "songTotal" to songTotal
+                ))
 
             val progress = if (duration > 0f)
                 ((currentTime.coerceIn(0f, duration) / duration) * 100).toInt()
@@ -162,6 +177,11 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
             appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_song_list)
+
+            logger.logDebug("Widget update completed successfully", mapOf("appWidgetId" to appWidgetId))
+        } catch (e: Exception) {
+            logger.logError("Widget update failed", e, mapOf("appWidgetId" to appWidgetId))
+            throw e
         }
 
         private fun buildRefreshIntent(context: Context): PendingIntent {
@@ -207,15 +227,44 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        appWidgetIds.forEach { id -> updateAppWidget(context, appWidgetManager, id) }
+        val logger = WidgetLogger(context)
+        logger.logInfo("Widget onUpdate called", mapOf("widgetIds" to appWidgetIds.toList()))
+        try {
+            appWidgetIds.forEach { id -> updateAppWidget(context, appWidgetManager, id) }
+            logger.logDebug("Widget onUpdate completed successfully")
+        } catch (e: Exception) {
+            logger.logError("Widget onUpdate failed", e)
+            throw e
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        when (intent.action) {
-            ACTION_REFRESH_LIBRARY -> buildOpenLibraryIntent(context, true).send()
-            ACTION_OPEN_LIBRARY -> buildOpenLibraryIntent(context, false).send()
-            AppWidgetManager.ACTION_APPWIDGET_UPDATE -> updateAllWidgets(context)
+        val logger = WidgetLogger(context)
+        val action = intent.action ?: "null"
+        logger.logInfo("Widget onReceive called", mapOf("action" to action))
+        try {
+            when (intent.action) {
+                ACTION_REFRESH_LIBRARY -> {
+                    logger.logInfo("Processing ACTION_REFRESH_LIBRARY")
+                    buildOpenLibraryIntent(context, true).send()
+                }
+                ACTION_OPEN_LIBRARY -> {
+                    logger.logInfo("Processing ACTION_OPEN_LIBRARY")
+                    buildOpenLibraryIntent(context, false).send()
+                }
+                AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
+                    logger.logInfo("Processing ACTION_APPWIDGET_UPDATE")
+                    updateAllWidgets(context)
+                }
+                else -> {
+                    logger.logWarn("Unknown action received", mapOf("action" to action))
+                }
+            }
+            logger.logDebug("Widget onReceive completed successfully")
+        } catch (e: Exception) {
+            logger.logError("Widget onReceive failed", e, mapOf("action" to action))
+            throw e
         }
     }
 }

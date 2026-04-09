@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import dev.sumanth.spd.utils.WidgetLogger
 
 class WidgetCopyLogReceiver : BroadcastReceiver() {
 
@@ -14,7 +15,14 @@ class WidgetCopyLogReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
-        if (intent?.action != ACTION_COPY_LOG) return
+        val logger = WidgetLogger(context)
+        logger.logInfo("WidgetCopyLogReceiver onReceive called", mapOf("action" to intent?.action))
+
+        if (intent?.action != ACTION_COPY_LOG) {
+            logger.logWarn("Invalid action received", mapOf("expected" to ACTION_COPY_LOG, "received" to intent?.action))
+            return
+        }
+
         try {
             val playerPrefs = context.getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
             val listPrefs = context.getSharedPreferences(WidgetSongListFactory.PREFS_NAME, Context.MODE_PRIVATE)
@@ -59,7 +67,14 @@ class WidgetCopyLogReceiver : BroadcastReceiver() {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("SPD Widget Log", log))
             Toast.makeText(context, "Widget log copied to clipboard", Toast.LENGTH_SHORT).show()
+
+            logger.logInfo("Widget log copied to clipboard successfully", mapOf(
+                "logLength" to log.length,
+                "songCount" to songCount,
+                "hasLastError" to (lastError != "none")
+            ))
         } catch (e: Exception) {
+            logger.logError("Failed to copy widget log", e)
             Toast.makeText(context, "Copy failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
