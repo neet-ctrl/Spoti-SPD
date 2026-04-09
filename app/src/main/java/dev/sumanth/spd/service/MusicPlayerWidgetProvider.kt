@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
 import dev.sumanth.spd.utils.WidgetLogger
@@ -89,6 +90,20 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
             val queueLabel = if (songPos >= 0 && songTotal > 0) "${songPos + 1} / $songTotal" else "— / —"
 
+            // Set up ListView adapter for song list
+            val adapterIntent = Intent(context, WidgetSongListService::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            }
+
+            val itemClickTemplate = PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 1000,
+                Intent(MusicPlayerService.ACTION_PLAY_SONG_INDEX).apply {
+                    setPackage(context.packageName)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             val remoteViews = RemoteViews(context.packageName, R.layout.widget_music_player).apply {
                 setTextViewText(R.id.widget_title, if (isLoading) "Loading..." else title)
                 setTextViewText(R.id.widget_artist, artist.ifBlank { "Library Player" })
@@ -149,9 +164,16 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_volume_down, buildControlIntent(context, MusicPlayerService.ACTION_VOLUME_DOWN))
                 setOnClickPendingIntent(R.id.widget_refresh, buildRefreshIntent(context))
                 setOnClickPendingIntent(R.id.widget_root, buildOpenLibraryIntent(context, false))
+
+                // Set up ListView adapter and click handling
+                setRemoteAdapter(R.id.widget_song_list, adapterIntent)
+                setPendingIntentTemplate(R.id.widget_song_list, itemClickTemplate)
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
+
+            // Notify the ListView that data has changed
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_song_list)
 
             logger.logDebug("Widget update completed successfully", mapOf("appWidgetId" to appWidgetId))
         } catch (e: Exception) {
@@ -193,8 +215,10 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
     }
 
     private fun buildControlIntent(context: Context, action: String): PendingIntent {
-        val intent = Intent(context, MusicPlayerService::class.java).apply { this.action = action }
-        return PendingIntent.getService(
+        val intent = Intent(action).apply {
+            setPackage(context.packageName)  // Ensure it stays within our app
+        }
+        return PendingIntent.getBroadcast(
             context, action.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

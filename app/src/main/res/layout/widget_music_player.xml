@@ -361,4 +361,14 @@
             android:background="@drawable/widget_pill_bg" />
     </LinearLayout>
 
+    <ListView
+        android:id="@+id/widget_song_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:scrollbars="none"
+        android:background="@android:color/transparent" />
+
 </LinearLayout>
