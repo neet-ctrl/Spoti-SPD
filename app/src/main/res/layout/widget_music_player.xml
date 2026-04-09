@@ -87,14 +87,15 @@
             android:textSize="12sp" />
     </LinearLayout>
 
-    <SeekBar
+    <ProgressBar
+        style="@android:style/Widget.ProgressBar.Horizontal"
         android:id="@+id/widget_progress"
         android:layout_width="match_parent"
         android:layout_height="4dp"
         android:progress="0"
         android:max="100"
+        android:indeterminate="false"
         android:progressTint="#1DB954"
-        android:thumbTint="#1DB954"
         android:backgroundTint="#3E3E3E"
         android:paddingBottom="12dp" />
 
