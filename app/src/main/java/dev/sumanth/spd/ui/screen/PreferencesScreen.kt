@@ -26,13 +26,14 @@ import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Update
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -195,21 +196,31 @@ fun PreferencesScreen() {
                     val widgetLogger = remember { WidgetLogger(context) }
                     val logs = remember { widgetLogger.getLogs() }
 
+                    val lastWidgetError = remember { WidgetSongListFactory.getLastError(context).takeIf { it.isNotBlank() } ?: "No recent widget service error" }
+
                     SettingsItem(
                         icon = Icons.Filled.Code,
                         iconTint = MaterialTheme.colorScheme.primary,
                         title = "Widget Debug Logs",
-                        subtitle = "${logs.size} entries • Tap to view",
+                        subtitle = "${logs.size} entries • Tap to copy",
                         showArrow = true,
                         onClick = {
-                            // Show logs in a dialog or navigate to a log screen
                             val logText = widgetLogger.getLogsAsString()
-                            // For now, we'll just copy to clipboard
                             val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                             clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Widget Debug Logs", logText))
-                            // Show toast
                             android.widget.Toast.makeText(context, "Widget logs copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
                         }
+                    )
+
+                    SettingsDivider()
+
+                    SettingsItem(
+                        icon = Icons.Filled.BugReport,
+                        iconTint = MaterialTheme.colorScheme.error,
+                        title = "Last Widget Service Error",
+                        subtitle = lastWidgetError,
+                        showArrow = false,
+                        onClick = {}
                     )
 
                     SettingsDivider()

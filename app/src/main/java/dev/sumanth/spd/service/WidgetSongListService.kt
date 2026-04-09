@@ -10,7 +10,14 @@ import org.json.JSONArray
 
 class WidgetSongListService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
-        return WidgetSongListFactory(applicationContext, intent)
+        return try {
+            WidgetLogger(applicationContext).logInfo("WidgetSongListService onGetViewFactory called")
+            WidgetSongListFactory(applicationContext, intent)
+        } catch (e: Exception) {
+            WidgetSongListFactory.saveLastError(applicationContext, "Factory init failed: ${e.message}")
+            WidgetLogger(applicationContext).logError("WidgetSongListService onGetViewFactory failed", e)
+            throw e
+        }
     }
 }
 
@@ -115,8 +122,9 @@ class WidgetSongListFactory(
             ))
         } catch (e: Exception) {
             isEmpty = true
-            saveLastError(context, "Load error: ${e.message?.take(80)}")
-            logger.logError("Failed to load songs data", e)
+            val errorMessage = "Load error: ${e.message?.take(80)}"
+            saveLastError(context, errorMessage)
+            logger.logError("Failed to load songs data", e, mapOf("error" to errorMessage))
         }
     }
 
