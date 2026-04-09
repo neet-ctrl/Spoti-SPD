@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.RemoteViews
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
@@ -90,25 +89,6 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
             val queueLabel = if (songPos >= 0 && songTotal > 0) "${songPos + 1} / $songTotal" else "— / —"
 
-            val adapterIntent = Intent(context, WidgetSongListService::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
-            }
-
-            val itemClickFlags = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-            val itemClickTemplate = PendingIntent.getService(
-                context,
-                appWidgetId * 1000,
-                Intent(context, MusicPlayerService::class.java).apply {
-                    action = MusicPlayerService.ACTION_PLAY_SONG_INDEX
-                },
-                itemClickFlags
-            )
-
             val remoteViews = RemoteViews(context.packageName, R.layout.widget_music_player).apply {
                 setTextViewText(R.id.widget_title, if (isLoading) "Loading..." else title)
                 setTextViewText(R.id.widget_artist, artist.ifBlank { "Library Player" })
@@ -156,9 +136,6 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
                 setImageViewResource(R.id.widget_album_art, R.drawable.spd_icon)
 
-                setRemoteAdapter(R.id.widget_song_list, adapterIntent)
-                setPendingIntentTemplate(R.id.widget_song_list, itemClickTemplate)
-
                 setOnClickPendingIntent(R.id.widget_shuffle, buildControlIntent(context, MusicPlayerService.ACTION_SHUFFLE))
                 setOnClickPendingIntent(R.id.widget_seek_backward, buildControlIntent(context, MusicPlayerService.ACTION_SEEK_BACKWARD))
                 setOnClickPendingIntent(R.id.widget_prev, buildControlIntent(context, MusicPlayerService.ACTION_PREV))
@@ -172,11 +149,9 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_volume_down, buildControlIntent(context, MusicPlayerService.ACTION_VOLUME_DOWN))
                 setOnClickPendingIntent(R.id.widget_refresh, buildRefreshIntent(context))
                 setOnClickPendingIntent(R.id.widget_root, buildOpenLibraryIntent(context, false))
-                setOnClickPendingIntent(R.id.widget_copy_log, buildCopyLogIntent(context))
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
-            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_song_list)
 
             logger.logDebug("Widget update completed successfully", mapOf("appWidgetId" to appWidgetId))
         } catch (e: Exception) {
@@ -224,48 +199,47 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
-}
 
-override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-    super.onUpdate(context, appWidgetManager, appWidgetIds)
-    val logger = WidgetLogger(context)
-    logger.logInfo("Widget onUpdate called", mapOf("widgetIds" to appWidgetIds.toList()))
-    try {
-        appWidgetIds.forEach { id -> updateAppWidget(context, appWidgetManager, id) }
-        logger.logDebug("Widget onUpdate completed successfully")
-    } catch (e: Exception) {
-        logger.logError("Widget onUpdate failed", e)
-        throw e
-    }
-}
-
-override fun onReceive(context: Context, intent: Intent) {
-    super.onReceive(context, intent)
-    val logger = WidgetLogger(context)
-    val action = intent.action ?: "null"
-    logger.logInfo("Widget onReceive called", mapOf("action" to action))
-    try {
-        when (intent.action) {
-            ACTION_REFRESH_LIBRARY -> {
-                logger.logInfo("Processing ACTION_REFRESH_LIBRARY")
-                buildOpenLibraryIntent(context, true).send()
-            }
-            ACTION_OPEN_LIBRARY -> {
-                logger.logInfo("Processing ACTION_OPEN_LIBRARY")
-                buildOpenLibraryIntent(context, false).send()
-            }
-            AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
-                logger.logInfo("Processing ACTION_APPWIDGET_UPDATE")
-                updateAllWidgets(context)
-            }
-            else -> {
-                logger.logWarn("Unknown action received", mapOf("action" to action))
-            }
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        val logger = WidgetLogger(context)
+        logger.logInfo("Widget onUpdate called", mapOf("widgetIds" to appWidgetIds.toList()))
+        try {
+            appWidgetIds.forEach { id -> updateAppWidget(context, appWidgetManager, id) }
+            logger.logDebug("Widget onUpdate completed successfully")
+        } catch (e: Exception) {
+            logger.logError("Widget onUpdate failed", e)
+            throw e
         }
-        logger.logDebug("Widget onReceive completed successfully")
-    } catch (e: Exception) {
-        logger.logError("Widget onReceive failed", e, mapOf("action" to action))
-        throw e
     }
-}
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        val logger = WidgetLogger(context)
+        val action = intent.action ?: "null"
+        logger.logInfo("Widget onReceive called", mapOf("action" to action))
+        try {
+            when (intent.action) {
+                ACTION_REFRESH_LIBRARY -> {
+                    logger.logInfo("Processing ACTION_REFRESH_LIBRARY")
+                    buildOpenLibraryIntent(context, true).send()
+                }
+                ACTION_OPEN_LIBRARY -> {
+                    logger.logInfo("Processing ACTION_OPEN_LIBRARY")
+                    buildOpenLibraryIntent(context, false).send()
+                }
+                AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
+                    logger.logInfo("Processing ACTION_APPWIDGET_UPDATE")
+                    updateAllWidgets(context)
+                }
+                else -> {
+                    logger.logWarn("Unknown action received", mapOf("action" to action))
+                }
+            }
+            logger.logDebug("Widget onReceive completed successfully")
+        } catch (e: Exception) {
+            logger.logError("Widget onReceive failed", e, mapOf("action" to action))
+            throw e
+        }
+    }
 }
