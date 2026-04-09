@@ -71,7 +71,7 @@ fun PreferencesScreen() {
     var autoUpdateCheck by remember { mutableStateOf(sharedPref.getAutoUpdateCheck()) }
 
     val uriHandler = LocalUriHandler.current
-    val githubUrl = "https://github.com/Shakti-ctrl/spoti"
+    val githubUrl = "https://github.com/neet-ctrl/Spoti-SPD"
 
     val version = remember {
         try {

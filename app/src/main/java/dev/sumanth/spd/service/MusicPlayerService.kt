@@ -20,6 +20,7 @@ import androidx.media.app.NotificationCompat.MediaStyle
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
+import org.json.JSONArray
 
 class MusicPlayerService : Service() {
 
@@ -54,6 +55,7 @@ class MusicPlayerService : Service() {
         const val EXTRA_REPEAT_MODE = "extra_repeat_mode"
         const val EXTRA_IS_FAVORITE = "extra_is_favorite"
         const val EXTRA_SONG_INDEX = "extra_song_index"
+        const val EXTRA_HANDLED_BY_SERVICE = "extra_handled_by_service"
         const val EXTRA_SPEED = "extra_speed"
         const val EXTRA_VOLUME = "extra_volume"
         const val EXTRA_SONG_POSITION = "extra_song_position"
@@ -110,7 +112,19 @@ class MusicPlayerService : Service() {
         }
     }
 
+    data class LocalPlaybackSong(
+        val title: String,
+        val artist: String,
+        val filePath: String,
+        val duration: Long,
+        val index: Int
+    )
+
     private var mediaSession: MediaSessionCompat? = null
+    private val localPlaybackList = mutableListOf<LocalPlaybackSong>()
+    private var currentLocalIndex = -1
+    private var localMediaPlayer: android.media.MediaPlayer? = null
+    private var isLocalLoading = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -121,6 +135,8 @@ class MusicPlayerService : Service() {
     }
 
     override fun onDestroy() {
+        releaseLocalPlayer()
+        localPlaybackList.clear()
         mediaSession?.isActive = false
         mediaSession?.release()
         mediaSession = null
@@ -162,16 +178,263 @@ class MusicPlayerService : Service() {
         )
     }
 
+    private fun handlePlaySongIndex(songIndex: Int) {
+        if (!loadLocalPlaybackList()) return
+        if (songIndex !in localPlaybackList.indices) return
+
+        val song = localPlaybackList[songIndex]
+        currentLocalIndex = songIndex
+        savePendingAction(this, ACTION_PLAY_SONG_INDEX)
+        getSharedPreferences(PENDING_PREFS, Context.MODE_PRIVATE)
+            .edit().putInt("pending_song_index", songIndex).apply()
+
+        LocalBroadcastManager.getInstance(this).sendBroadcast(
+            Intent(ACTION_PLAY_SONG_INDEX).apply {
+                setPackage(packageName)
+                putExtra(EXTRA_SONG_INDEX, songIndex)
+                putExtra(EXTRA_HANDLED_BY_SERVICE, true)
+            }
+        )
+
+        playLocalSong(song)
+    }
+
+    private fun handlePlayPause(): Boolean {
+        localMediaPlayer?.let {
+            if (it.isPlaying) {
+                it.pause()
+                updateServiceNotification(false)
+                saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), false, false, getCurrentPlaybackPosition(), getCurrentDuration())
+            } else {
+                it.start()
+                updateServiceNotification(true)
+                saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), true, false, getCurrentPlaybackPosition(), getCurrentDuration())
+            }
+            return true
+        }
+        return false
+    }
+
+    private fun playLocalSong(song: LocalPlaybackSong) {
+        releaseLocalPlayer()
+        isLocalLoading = true
+        updateServiceNotification(false, 0f, 0f, true, song.title, song.artist)
+        saveWidgetPlaybackState(song.title, song.artist, false, true, 0f, 0f)
+
+        try {
+            localMediaPlayer = android.media.MediaPlayer().apply {
+                setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .build()
+                )
+                setDataSource(song.filePath)
+                setOnPrepared { player ->
+                    isLocalLoading = false
+                    player.start()
+                    val durationSeconds = (player.duration / 1000f).coerceAtLeast(0f)
+                    updateServiceNotification(true, 0f, durationSeconds, false, song.title, song.artist)
+                    saveWidgetPlaybackState(song.title, song.artist, true, false, 0f, durationSeconds)
+                }
+                setOnCompletion { player ->
+                    updateServiceNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
+                    saveWidgetPlaybackState(song.title, song.artist, false, false, getCurrentPlaybackPosition(), getCurrentDuration())
+                }
+                setOnError { _, what, extra ->
+                    updateServiceNotification(false, 0f, 0f, false, song.title, song.artist)
+                    saveWidgetPlaybackState(song.title, song.artist, false, false, 0f, 0f)
+                    false
+                }
+                prepareAsync()
+            }
+        } catch (e: Exception) {
+            updateServiceNotification(false, 0f, 0f, false, song.title, song.artist)
+            saveWidgetPlaybackState(song.title, song.artist, false, false, 0f, 0f)
+        }
+    }
+
+    private fun getCurrentSongTitle(): String {
+        return localPlaybackList.getOrNull(currentLocalIndex)?.title ?: "Unknown"
+    }
+
+    private fun getCurrentSongArtist(): String {
+        return localPlaybackList.getOrNull(currentLocalIndex)?.artist ?: ""
+    }
+
+    private fun getCurrentPlaybackPosition(): Float {
+        return localMediaPlayer?.currentPosition?.div(1000f) ?: 0f
+    }
+
+    private fun getCurrentDuration(): Float {
+        return localMediaPlayer?.duration?.div(1000f) ?: 0f
+    }
+
+    private fun updateServiceNotification(
+        isPlaying: Boolean,
+        currentTime: Float = getCurrentPlaybackPosition(),
+        duration: Float = getCurrentDuration(),
+        isLoading: Boolean = false,
+        title: String = getCurrentSongTitle(),
+        artist: String = getCurrentSongArtist()
+    ) {
+        val notification = buildNotification(
+            title,
+            artist,
+            isPlaying,
+            currentTime,
+            duration,
+            isLoading,
+            false,
+            0,
+            false,
+            1f,
+            1f,
+            currentLocalIndex,
+            localPlaybackList.size
+        )
+        startForeground(NOTIFICATION_ID, notification)
+    }
+
+    private fun saveWidgetPlaybackState(
+        title: String,
+        artist: String,
+        isPlaying: Boolean,
+        isLoading: Boolean,
+        currentTime: Float,
+        duration: Float
+    ) {
+        val prefs = getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("title", title)
+            .putString("artist", artist)
+            .putFloat("current_time", currentTime)
+            .putFloat("duration", duration)
+            .putBoolean("is_playing", isPlaying)
+            .putBoolean("is_loading", isLoading)
+            .apply()
+        MusicPlayerWidgetProvider.updateAllWidgets(this)
+    }
+
+    private fun loadLocalPlaybackList(): Boolean {
+        localPlaybackList.clear()
+        val prefs = getSharedPreferences(WidgetSongListFactory.PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonStr = prefs.getString(WidgetSongListFactory.KEY_SONGS_JSON, null) ?: return false
+        return try {
+            val arr = JSONArray(jsonStr)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val filePath = obj.optString("filePath", "")
+                if (filePath.isBlank()) continue
+                localPlaybackList.add(
+                    LocalPlaybackSong(
+                        title = obj.optString("title", "Unknown"),
+                        artist = obj.optString("artist", ""),
+                        filePath = filePath,
+                        duration = obj.optLong("duration", 0L),
+                        index = i
+                    )
+                )
+            }
+            localPlaybackList.isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun handleNext(): Boolean {
+        if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
+        val nextIndex = if (currentLocalIndex < localPlaybackList.size - 1) currentLocalIndex + 1 else 0
+        val nextSong = localPlaybackList[nextIndex]
+        currentLocalIndex = nextIndex
+        playLocalSong(nextSong)
+        return true
+    }
+
+    private fun handlePrev(): Boolean {
+        if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
+        val prevIndex = if (currentLocalIndex > 0) currentLocalIndex - 1 else localPlaybackList.size - 1
+        val prevSong = localPlaybackList[prevIndex]
+        currentLocalIndex = prevIndex
+        playLocalSong(prevSong)
+        return true
+    }
+
+    private fun handleSeekForward(): Boolean {
+        localMediaPlayer?.let {
+            val newPos = (it.currentPosition + 10000).coerceAtMost(it.duration)
+            it.seekTo(newPos)
+            updateServiceNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f)
+            saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), it.isPlaying, false, newPos / 1000f, it.duration / 1000f)
+            return true
+        }
+        return false
+    }
+
+    private fun handleSeekBackward(): Boolean {
+        localMediaPlayer?.let {
+            val newPos = (it.currentPosition - 10000).coerceAtLeast(0)
+            it.seekTo(newPos)
+            updateServiceNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f)
+            saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), it.isPlaying, false, newPos / 1000f, it.duration / 1000f)
+            return true
+        }
+        return false
+    }
+
+    private fun handleClose(): Boolean {
+        releaseLocalPlayer()
+        localPlaybackList.clear()
+        currentLocalIndex = -1
+        isLocalLoading = false
+        saveWidgetPlaybackState("No song selected", "", false, false, 0f, 0f)
+        return true
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_PLAY_PAUSE,
-            ACTION_NEXT,
-            ACTION_PREV,
+            ACTION_PLAY_PAUSE -> {
+                val action = intent.action ?: return START_STICKY
+                if (!handlePlayPause()) {
+                    dispatchAction(action)
+                }
+            }
+            ACTION_NEXT -> {
+                if (!handleNext()) {
+                    dispatchAction(ACTION_NEXT)
+                }
+            }
+            ACTION_PREV -> {
+                if (!handlePrev()) {
+                    dispatchAction(ACTION_PREV)
+                }
+            }
+            ACTION_SEEK_FORWARD -> {
+                if (!handleSeekForward()) {
+                    dispatchAction(ACTION_SEEK_FORWARD)
+                }
+            }
+            ACTION_SEEK_BACKWARD -> {
+                if (!handleSeekBackward()) {
+                    dispatchAction(ACTION_SEEK_BACKWARD)
+                }
+            }
+            ACTION_CLOSE -> {
+                if (!handleClose()) {
+                    dispatchAction(ACTION_CLOSE)
+                    mediaSession?.isActive = false
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                    }
+                    stopSelf()
+                }
+            }
             ACTION_SHUFFLE,
             ACTION_REPEAT,
             ACTION_TOGGLE_FAVORITE,
-            ACTION_SEEK_BACKWARD,
-            ACTION_SEEK_FORWARD,
             ACTION_SPEED_CHANGE,
             ACTION_VOLUME_UP,
             ACTION_VOLUME_DOWN,
@@ -182,28 +445,8 @@ class MusicPlayerService : Service() {
             ACTION_PLAY_SONG_INDEX -> {
                 val songIndex = intent.getIntExtra(EXTRA_SONG_INDEX, -1)
                 if (songIndex >= 0) {
-                    savePendingAction(this, ACTION_PLAY_SONG_INDEX)
-                    getSharedPreferences(PENDING_PREFS, Context.MODE_PRIVATE)
-                        .edit().putInt("pending_song_index", songIndex).apply()
-                    LocalBroadcastManager.getInstance(this).sendBroadcast(
-                        Intent(ACTION_PLAY_SONG_INDEX).apply {
-                            setPackage(packageName)
-                            putExtra(EXTRA_SONG_INDEX, songIndex)
-                        }
-                    )
-                    // Removed launchApp() - don't open app for widget playback
+                    handlePlaySongIndex(songIndex)
                 }
-            }
-            ACTION_CLOSE -> {
-                dispatchAction(ACTION_CLOSE)
-                mediaSession?.isActive = false
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                }
-                stopSelf()
             }
             ACTION_UPDATE -> handleUpdate(intent)
         }

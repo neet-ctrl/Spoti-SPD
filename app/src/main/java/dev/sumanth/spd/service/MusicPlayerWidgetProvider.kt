@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.RemoteViews
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -113,12 +114,21 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                     action = MusicPlayerService.ACTION_PLAY_SONG_INDEX
                     flags = PendingIntent.FLAG_UPDATE_CURRENT
                 }
-                val songClickTemplate = PendingIntent.getService(
-                    context,
-                    REQUEST_CODE_SONG_CLICK,
-                    songClickIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                )
+                val songClickTemplate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    PendingIntent.getForegroundService(
+                        context,
+                        REQUEST_CODE_SONG_CLICK,
+                        songClickIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                    )
+                } else {
+                    PendingIntent.getService(
+                        context,
+                        REQUEST_CODE_SONG_CLICK,
+                        songClickIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                    )
+                }
                 setPendingIntentTemplate(R.id.widget_song_list, songClickTemplate)
             }
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
@@ -177,12 +187,21 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
         private fun buildControlIntent(context: Context, action: String): PendingIntent {
             val intent = Intent(context, MusicPlayerService::class.java).apply { this.action = action }
-            return PendingIntent.getService(
-                context,
-                action.hashCode(),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(
+                    context,
+                    action.hashCode(),
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                PendingIntent.getService(
+                    context,
+                    action.hashCode(),
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
         }
     }
 

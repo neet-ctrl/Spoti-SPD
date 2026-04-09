@@ -122,7 +122,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 MusicPlayerService.ACTION_CLOSE -> closePlayer()
                 MusicPlayerService.ACTION_PLAY_SONG_INDEX -> {
                     val idx = intent?.getIntExtra(MusicPlayerService.EXTRA_SONG_INDEX, -1) ?: -1
-                    if (idx >= 0) playLocalSongFromWidget(idx)
+                    val handledByService = intent?.getBooleanExtra(MusicPlayerService.EXTRA_HANDLED_BY_SERVICE, false) ?: false
+                    if (idx >= 0 && !handledByService) playLocalSongFromWidget(idx)
                 }
                 MusicPlayerService.ACTION_SPEED_CHANGE -> cyclePlaybackSpeed()
                 MusicPlayerService.ACTION_VOLUME_UP -> adjustVolume(0.1f)
