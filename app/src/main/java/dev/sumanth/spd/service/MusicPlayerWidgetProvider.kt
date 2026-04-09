@@ -7,10 +7,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
-import dev.sumanth.spd.utils.WidgetLogger
+import dev.sumanth.spd.service.MusicPlayerService
 
 class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
@@ -25,11 +24,6 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         private const val KEY_IS_SHUFFLE = "is_shuffle"
         private const val KEY_REPEAT_MODE = "repeat_mode"
         private const val KEY_IS_FAVORITE = "is_favorite"
-        private const val KEY_SONG_COUNT = "song_count"
-        private const val KEY_SPEED = "speed"
-        private const val KEY_VOLUME = "volume"
-        private const val KEY_SONG_POSITION = "song_position"
-        private const val KEY_SONG_TOTAL = "song_total"
 
         const val ACTION_REFRESH_LIBRARY = "dev.sumanth.spd.ACTION_REFRESH_LIBRARY"
         const val ACTION_OPEN_LIBRARY = "dev.sumanth.spd.ACTION_OPEN_LIBRARY"
@@ -40,231 +34,124 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             val thisWidget = ComponentName(context, MusicPlayerWidgetProvider::class.java)
             val ids = manager.getAppWidgetIds(thisWidget)
             if (ids.isEmpty()) return
-            ids.forEach { appWidgetId -> updateAppWidget(context, manager, appWidgetId) }
+            ids.forEach { appWidgetId ->
+                updateAppWidget(context, manager, appWidgetId)
+            }
         }
 
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-            val logger = WidgetLogger(context)
-            logger.logDebug("Starting widget update", mapOf("appWidgetId" to appWidgetId))
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val title = prefs.getString(KEY_TITLE, "No song selected") ?: "No song selected"
+            val artist = prefs.getString(KEY_ARTIST, "") ?: ""
+            val currentTime = prefs.getFloat(KEY_CURRENT_TIME, 0f)
+            val duration = prefs.getFloat(KEY_DURATION, 0f)
+            val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
+            val isLoading = prefs.getBoolean(KEY_IS_LOADING, false)
+            val isShuffle = prefs.getBoolean(KEY_IS_SHUFFLE, false)
+            val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
+            val isFavorite = prefs.getBoolean(KEY_IS_FAVORITE, false)
 
-            try {
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val title = prefs.getString(KEY_TITLE, "No song selected") ?: "No song selected"
-                val artist = prefs.getString(KEY_ARTIST, "") ?: ""
-                val currentTime = prefs.getFloat(KEY_CURRENT_TIME, 0f)
-                val duration = prefs.getFloat(KEY_DURATION, 0f)
-                val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
-                val isLoading = prefs.getBoolean(KEY_IS_LOADING, false)
-                val isShuffle = prefs.getBoolean(KEY_IS_SHUFFLE, false)
-                val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
-                val isFavorite = prefs.getBoolean(KEY_IS_FAVORITE, false)
-                val songCount = prefs.getInt(KEY_SONG_COUNT, 0)
-                val speed = prefs.getFloat(KEY_SPEED, 1f)
-                val volume = prefs.getFloat(KEY_VOLUME, 1f)
-                val songPos = prefs.getInt(KEY_SONG_POSITION, -1)
-                val songTotal = prefs.getInt(KEY_SONG_TOTAL, 0)
-
-                logger.logDebug("Loaded widget state", mapOf(
-                    "title" to title,
-                    "artist" to artist,
-                    "isPlaying" to isPlaying,
-                    "isLoading" to isLoading,
-                    "songCount" to songCount,
-                    "songPos" to songPos,
-                    "songTotal" to songTotal
-                ))
-
-            val progress = if (duration > 0f)
+            val progress = if (duration > 0f) {
                 ((currentTime.coerceIn(0f, duration) / duration) * 100).toInt()
-            else 0
-
-            val volumePercent = (volume.coerceIn(0f, 1f) * 100).toInt()
-
-            val speedLabel = when {
-                speed <= 0.76f -> "0.75×"
-                speed <= 1.01f -> "1×"
-                speed <= 1.26f -> "1.25×"
-                speed <= 1.51f -> "1.5×"
-                else -> "2×"
+            } else {
+                0
             }
-
-            val queueLabel = if (songPos >= 0 && songTotal > 0) "${songPos + 1} / $songTotal" else "— / —"
-
-            // Set up ListView adapter for song list
-            val adapterIntent = Intent(context, WidgetSongListService::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            }
-
-            val itemClickTemplate = PendingIntent.getBroadcast(
-                context,
-                appWidgetId * 1000,
-                Intent(MusicPlayerService.ACTION_PLAY_SONG_INDEX).apply {
-                    setPackage(context.packageName)
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
 
             val remoteViews = RemoteViews(context.packageName, R.layout.widget_music_player).apply {
-                setTextViewText(R.id.widget_title, if (isLoading) "Loading..." else title)
-                setTextViewText(R.id.widget_artist, artist.ifBlank { "Library Player" })
-                setTextViewText(
-                    R.id.widget_current_time,
-                    "%d:%02d".format(currentTime.toInt() / 60, currentTime.toInt() % 60)
-                )
-                setTextViewText(
-                    R.id.widget_total_duration,
-                    "%d:%02d".format(duration.toInt() / 60, duration.toInt() % 60)
-                )
+                setTextViewText(R.id.widget_title, title)
+                setTextViewText(R.id.widget_artist, artist)
+                setTextViewText(R.id.widget_current_time, "%d:%02d".format((currentTime.toInt() / 60), currentTime.toInt() % 60))
+                setTextViewText(R.id.widget_total_duration, "%d:%02d".format((duration.toInt() / 60), duration.toInt() % 60))
                 setProgressBar(R.id.widget_progress, 100, progress, false)
-                setProgressBar(R.id.widget_volume_bar, 100, volumePercent, false)
-                setTextViewText(R.id.widget_speed_label, speedLabel)
-                setTextViewText(R.id.widget_queue_pos, queueLabel)
-                setTextViewText(
-                    R.id.widget_status,
-                    if (isLoading) "Scanning library..." else "Song Queue"
-                )
-                setTextViewText(
-                    R.id.widget_song_count,
-                    if (songCount > 0) "$songCount songs" else ""
-                )
-
                 setImageViewResource(
                     R.id.widget_play_pause,
-                    if (isPlaying) R.drawable.ic_pause_widget else R.drawable.ic_play_widget
+                    if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
                 )
-                setImageViewResource(R.id.widget_shuffle, R.drawable.ic_shuffle_widget)
-                setInt(R.id.widget_shuffle, "setColorFilter",
-                    if (isShuffle) 0xFF1DB954.toInt() else 0xFFAAAAAA.toInt())
-
-                setImageViewResource(R.id.widget_seek_backward, R.drawable.ic_fast_rewind_widget)
-                setImageViewResource(R.id.widget_prev, R.drawable.ic_skip_prev_widget)
-                setImageViewResource(R.id.widget_next, R.drawable.ic_skip_next_widget)
-                setImageViewResource(R.id.widget_seek_forward, R.drawable.ic_fast_forward_widget)
-
-                setImageViewResource(R.id.widget_repeat,
-                    if (repeatMode == 1) R.drawable.ic_repeat_one_widget else R.drawable.ic_repeat_widget)
-                setInt(R.id.widget_repeat, "setColorFilter",
-                    if (repeatMode > 0) 0xFF1DB954.toInt() else 0xFFAAAAAA.toInt())
-
-                setImageViewResource(R.id.widget_favorite,
-                    if (isFavorite) R.drawable.ic_favorite_widget else R.drawable.ic_favorite_border_widget)
-
-                setImageViewResource(R.id.widget_album_art, R.drawable.spd_icon)
-
+                setImageViewResource(
+                    R.id.widget_shuffle,
+                    if (isShuffle) android.R.drawable.ic_menu_rotate else android.R.drawable.ic_media_rew
+                )
+                setImageViewResource(
+                    R.id.widget_repeat,
+                    if (repeatMode == 1) android.R.drawable.ic_popup_sync else android.R.drawable.ic_menu_rotate
+                )
+                setImageViewResource(
+                    R.id.widget_favorite,
+                    if (isFavorite) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off
+                )
+                setTextViewText(R.id.widget_status, if (isLoading) "Loading..." else "Library mode")
                 setOnClickPendingIntent(R.id.widget_shuffle, buildControlIntent(context, MusicPlayerService.ACTION_SHUFFLE))
-                setOnClickPendingIntent(R.id.widget_seek_backward, buildControlIntent(context, MusicPlayerService.ACTION_SEEK_BACKWARD))
                 setOnClickPendingIntent(R.id.widget_prev, buildControlIntent(context, MusicPlayerService.ACTION_PREV))
                 setOnClickPendingIntent(R.id.widget_play_pause, buildControlIntent(context, MusicPlayerService.ACTION_PLAY_PAUSE))
                 setOnClickPendingIntent(R.id.widget_next, buildControlIntent(context, MusicPlayerService.ACTION_NEXT))
-                setOnClickPendingIntent(R.id.widget_seek_forward, buildControlIntent(context, MusicPlayerService.ACTION_SEEK_FORWARD))
                 setOnClickPendingIntent(R.id.widget_repeat, buildControlIntent(context, MusicPlayerService.ACTION_REPEAT))
                 setOnClickPendingIntent(R.id.widget_favorite, buildControlIntent(context, MusicPlayerService.ACTION_TOGGLE_FAVORITE))
-                setOnClickPendingIntent(R.id.widget_speed, buildControlIntent(context, MusicPlayerService.ACTION_SPEED_CHANGE))
-                setOnClickPendingIntent(R.id.widget_volume_up, buildControlIntent(context, MusicPlayerService.ACTION_VOLUME_UP))
-                setOnClickPendingIntent(R.id.widget_volume_down, buildControlIntent(context, MusicPlayerService.ACTION_VOLUME_DOWN))
                 setOnClickPendingIntent(R.id.widget_refresh, buildRefreshIntent(context))
                 setOnClickPendingIntent(R.id.widget_root, buildOpenLibraryIntent(context, false))
-
-                // Set up ListView adapter and click handling
-                setRemoteAdapter(R.id.widget_song_list, adapterIntent)
-                setPendingIntentTemplate(R.id.widget_song_list, itemClickTemplate)
             }
-
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
-
-            // Notify the ListView that data has changed
-            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_song_list)
-
-            logger.logDebug("Widget update completed successfully", mapOf("appWidgetId" to appWidgetId))
-        } catch (e: Exception) {
-            logger.logError("Widget update failed", e, mapOf("appWidgetId" to appWidgetId))
-            throw e
         }
-    }
 
-    private fun buildRefreshIntent(context: Context): PendingIntent {
-        val intent = Intent(context, MusicPlayerWidgetProvider::class.java).apply {
-            action = ACTION_REFRESH_LIBRARY
+        private fun buildRefreshIntent(context: Context): PendingIntent {
+            val intent = Intent(context, MusicPlayerWidgetProvider::class.java).apply {
+                action = ACTION_REFRESH_LIBRARY
+            }
+            return PendingIntent.getBroadcast(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
-        return PendingIntent.getBroadcast(
-            context, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
 
-    private fun buildCopyLogIntent(context: Context): PendingIntent {
-        val intent = Intent(context, WidgetCopyLogReceiver::class.java).apply {
-            action = WidgetCopyLogReceiver.ACTION_COPY_LOG
+        private fun buildOpenLibraryIntent(context: Context, refresh: Boolean): PendingIntent {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                action = ACTION_OPEN_LIBRARY
+                putExtra(EXTRA_REFRESH_LIBRARY, refresh)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            return PendingIntent.getActivity(
+                context,
+                1,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
-        return PendingIntent.getBroadcast(
-            context, 2, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
 
-    private fun buildOpenLibraryIntent(context: Context, refresh: Boolean): PendingIntent {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            action = ACTION_OPEN_LIBRARY
-            putExtra(EXTRA_REFRESH_LIBRARY, refresh)
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        private fun buildControlIntent(context: Context, action: String): PendingIntent {
+            val intent = Intent(context, MusicPlayerService::class.java).apply { this.action = action }
+            return PendingIntent.getService(
+                context,
+                action.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
-        return PendingIntent.getActivity(
-            context, 1, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
-
-    private fun buildControlIntent(context: Context, action: String): PendingIntent {
-        val intent = Intent(action).apply {
-            setPackage(context.packageName)  // Ensure it stays within our app
-        }
-        return PendingIntent.getBroadcast(
-            context, action.hashCode(), intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        val logger = WidgetLogger(context)
-        logger.logInfo("Widget onUpdate called", mapOf("widgetIds" to appWidgetIds.toList()))
-        try {
-            appWidgetIds.forEach { id -> updateAppWidget(context, appWidgetManager, id) }
-            logger.logDebug("Widget onUpdate completed successfully")
-        } catch (e: Exception) {
-            logger.logError("Widget onUpdate failed", e)
-            throw e
-        }
+        updateAllWidgets(context)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        val logger = WidgetLogger(context)
-        val action = intent.action ?: "null"
-        logger.logInfo("Widget onReceive called", mapOf("action" to action))
-        try {
-            when (intent.action) {
-                ACTION_REFRESH_LIBRARY -> {
-                    logger.logInfo("Processing ACTION_REFRESH_LIBRARY")
-                    buildOpenLibraryIntent(context, true).send()
-                }
-                ACTION_OPEN_LIBRARY -> {
-                    logger.logInfo("Processing ACTION_OPEN_LIBRARY")
-                    buildOpenLibraryIntent(context, false).send()
-                }
-                AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
-                    logger.logInfo("Processing ACTION_APPWIDGET_UPDATE")
-                    updateAllWidgets(context)
-                }
-                else -> {
-                    logger.logWarn("Unknown action received", mapOf("action" to action))
+        when (intent.action) {
+            ACTION_REFRESH_LIBRARY -> {
+                context?.let {
+                    buildOpenLibraryIntent(it, true).send()
                 }
             }
-            logger.logDebug("Widget onReceive completed successfully")
-        } catch (e: Exception) {
-            logger.logError("Widget onReceive failed", e, mapOf("action" to action))
-            throw e
+            ACTION_OPEN_LIBRARY -> {
+                context?.let {
+                    buildOpenLibraryIntent(it, false).send()
+                }
+            }
+            AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
+                context?.let {
+                    updateAllWidgets(it)
+                }
+            }
         }
     }
 }
