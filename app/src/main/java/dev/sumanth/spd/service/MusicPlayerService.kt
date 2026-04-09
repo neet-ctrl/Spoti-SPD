@@ -26,17 +26,43 @@ class MusicPlayerService : Service() {
         const val ACTION_NEXT = "dev.sumanth.spd.ACTION_NEXT"
         const val ACTION_PREV = "dev.sumanth.spd.ACTION_PREV"
         const val ACTION_CLOSE = "dev.sumanth.spd.ACTION_CLOSE"
+        const val ACTION_SHUFFLE = "dev.sumanth.spd.ACTION_SHUFFLE"
+        const val ACTION_REPEAT = "dev.sumanth.spd.ACTION_REPEAT"
+        const val ACTION_TOGGLE_FAVORITE = "dev.sumanth.spd.ACTION_TOGGLE_FAVORITE"
 
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_ARTIST = "extra_artist"
         const val EXTRA_IS_PLAYING = "extra_is_playing"
+        const val EXTRA_CURRENT_TIME = "extra_current_time"
+        const val EXTRA_DURATION = "extra_duration"
+        const val EXTRA_IS_LOADING = "extra_is_loading"
+        const val EXTRA_IS_SHUFFLE = "extra_is_shuffle"
+        const val EXTRA_REPEAT_MODE = "extra_repeat_mode"
+        const val EXTRA_IS_FAVORITE = "extra_is_favorite"
 
-        fun buildUpdateIntent(context: Context, title: String, artist: String, isPlaying: Boolean): Intent {
+        fun buildUpdateIntent(
+            context: Context,
+            title: String,
+            artist: String,
+            isPlaying: Boolean,
+            currentTime: Float,
+            duration: Float,
+            isLoading: Boolean,
+            isShuffle: Boolean,
+            repeatMode: Int,
+            isFavorite: Boolean
+        ): Intent {
             return Intent(context, MusicPlayerService::class.java).apply {
                 action = ACTION_UPDATE
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_ARTIST, artist)
                 putExtra(EXTRA_IS_PLAYING, isPlaying)
+                putExtra(EXTRA_CURRENT_TIME, currentTime)
+                putExtra(EXTRA_DURATION, duration)
+                putExtra(EXTRA_IS_LOADING, isLoading)
+                putExtra(EXTRA_IS_SHUFFLE, isShuffle)
+                putExtra(EXTRA_REPEAT_MODE, repeatMode)
+                putExtra(EXTRA_IS_FAVORITE, isFavorite)
             }
         }
     }
@@ -59,6 +85,15 @@ class MusicPlayerService : Service() {
             ACTION_PREV -> {
                 sendBroadcast(Intent(ACTION_PREV))
             }
+            ACTION_SHUFFLE -> {
+                sendBroadcast(Intent(ACTION_SHUFFLE))
+            }
+            ACTION_REPEAT -> {
+                sendBroadcast(Intent(ACTION_REPEAT))
+            }
+            ACTION_TOGGLE_FAVORITE -> {
+                sendBroadcast(Intent(ACTION_TOGGLE_FAVORITE))
+            }
             ACTION_CLOSE -> {
                 sendBroadcast(Intent(ACTION_CLOSE))
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -73,14 +108,40 @@ class MusicPlayerService : Service() {
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: "Unknown"
                 val artist = intent.getStringExtra(EXTRA_ARTIST) ?: ""
                 val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
-                val notification = buildNotification(title, artist, isPlaying)
+                val currentTime = intent.getFloatExtra(EXTRA_CURRENT_TIME, 0f)
+                val duration = intent.getFloatExtra(EXTRA_DURATION, 0f)
+                val isLoading = intent.getBooleanExtra(EXTRA_IS_LOADING, false)
+                val isShuffle = intent.getBooleanExtra(EXTRA_IS_SHUFFLE, false)
+                val repeatMode = intent.getIntExtra(EXTRA_REPEAT_MODE, 0)
+                val isFavorite = intent.getBooleanExtra(EXTRA_IS_FAVORITE, false)
+                val notification = buildNotification(
+                    title,
+                    artist,
+                    isPlaying,
+                    currentTime,
+                    duration,
+                    isLoading,
+                    isShuffle,
+                    repeatMode,
+                    isFavorite
+                )
                 startForeground(NOTIFICATION_ID, notification)
             }
         }
         return START_STICKY
     }
 
-    private fun buildNotification(title: String, artist: String, isPlaying: Boolean): Notification {
+    private fun buildNotification(
+        title: String,
+        artist: String,
+        isPlaying: Boolean,
+        currentTime: Float,
+        duration: Float,
+        isLoading: Boolean,
+        isShuffle: Boolean,
+        repeatMode: Int,
+        isFavorite: Boolean
+    ): Notification {
         val openAppIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).apply {
@@ -107,24 +168,67 @@ class MusicPlayerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val shuffleIntent = PendingIntent.getService(
+            this, 5,
+            Intent(this, MusicPlayerService::class.java).apply { action = ACTION_SHUFFLE },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val repeatIntent = PendingIntent.getService(
+            this, 6,
+            Intent(this, MusicPlayerService::class.java).apply { action = ACTION_REPEAT },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val favoriteIntent = PendingIntent.getService(
+            this, 7,
+            Intent(this, MusicPlayerService::class.java).apply { action = ACTION_TOGGLE_FAVORITE },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val closeIntent = PendingIntent.getService(
             this, 4,
             Intent(this, MusicPlayerService::class.java).apply { action = ACTION_CLOSE },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val progressPercent = if (duration > 0f) {
+            ((currentTime.coerceIn(0f, duration) / duration) * 100).toInt()
+        } else {
+            0
+        }
+
         val notificationView = RemoteViews(packageName, R.layout.notification_music_player).apply {
             setTextViewText(R.id.notification_title, title)
             setTextViewText(R.id.notification_artist, artist)
+            setTextViewText(R.id.notification_current_time, "%d:%02d".format((currentTime.toInt() / 60), currentTime.toInt() % 60))
+            setTextViewText(R.id.notification_total_duration, "%d:%02d".format((duration.toInt() / 60), duration.toInt() % 60))
             setTextViewText(R.id.notification_header, "Library Player")
-            setTextViewText(R.id.notification_subheader, "SPD Media")
+            setTextViewText(R.id.notification_subheader, "SPD Music")
+            setTextViewText(R.id.notification_footer, if (isLoading) "Loading..." else "Library mode")
+            setProgressBar(R.id.notification_progress, 100, progressPercent, false)
             setImageViewResource(
                 R.id.action_play_pause,
                 if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
             )
+            setImageViewResource(
+                R.id.action_shuffle,
+                if (isShuffle) android.R.drawable.ic_menu_rotate else android.R.drawable.ic_media_rew
+            )
+            setImageViewResource(
+                R.id.action_repeat,
+                if (repeatMode == 1) android.R.drawable.ic_popup_sync else android.R.drawable.ic_menu_rotate
+            )
+            setImageViewResource(
+                R.id.action_favorite,
+                if (isFavorite) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off
+            )
             setOnClickPendingIntent(R.id.action_prev, prevIntent)
             setOnClickPendingIntent(R.id.action_play_pause, playPauseIntent)
             setOnClickPendingIntent(R.id.action_next, nextIntent)
+            setOnClickPendingIntent(R.id.action_shuffle, shuffleIntent)
+            setOnClickPendingIntent(R.id.action_repeat, repeatIntent)
+            setOnClickPendingIntent(R.id.action_favorite, favoriteIntent)
             setOnClickPendingIntent(R.id.notification_close, closeIntent)
             setOnClickPendingIntent(R.id.notification_root, openAppIntent)
             setInt(R.id.notification_root, "setBackgroundColor", Color.parseColor("#121212"))

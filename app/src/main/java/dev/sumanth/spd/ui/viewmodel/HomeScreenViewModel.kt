@@ -20,7 +20,7 @@ import dev.sumanth.spd.model.DownloadStatus
 import dev.sumanth.spd.model.LocalPlaybackItem
 import dev.sumanth.spd.model.Track
 import dev.sumanth.spd.service.MusicPlayerService
-import dev.sumanth.spd.service.LibraryWidgetProvider
+import dev.sumanth.spd.service.MusicPlayerWidgetProvider
 import dev.sumanth.spd.utils.DownloadHistoryManager
 import dev.sumanth.spd.utils.DownloadManager
 import dev.sumanth.spd.utils.SharedPref
@@ -103,6 +103,9 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 MusicPlayerService.ACTION_PLAY_PAUSE -> togglePlayPause()
                 MusicPlayerService.ACTION_NEXT -> nextSong()
                 MusicPlayerService.ACTION_PREV -> previousSong()
+                MusicPlayerService.ACTION_SHUFFLE -> toggleShuffle()
+                MusicPlayerService.ACTION_REPEAT -> toggleRepeatMode()
+                MusicPlayerService.ACTION_TOGGLE_FAVORITE -> toggleFavorite()
                 MusicPlayerService.ACTION_CLOSE -> closePlayer()
             }
         }
@@ -118,6 +121,9 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             addAction(MusicPlayerService.ACTION_PLAY_PAUSE)
             addAction(MusicPlayerService.ACTION_NEXT)
             addAction(MusicPlayerService.ACTION_PREV)
+            addAction(MusicPlayerService.ACTION_SHUFFLE)
+            addAction(MusicPlayerService.ACTION_REPEAT)
+            addAction(MusicPlayerService.ACTION_TOGGLE_FAVORITE)
             addAction(MusicPlayerService.ACTION_CLOSE)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -133,10 +139,32 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             getApplication(),
             song.title,
             song.artist,
-            isPlaying
+            isPlaying,
+            currentTime,
+            duration,
+            isPlayerLoading,
+            isShuffleMode,
+            repeatMode.ordinal,
+            isFavorite
         )
         getApplication<Application>().startService(intent)
-        LibraryWidgetProvider.updateAllWidgets(getApplication())
+        persistPlayerWidgetState(song.title, song.artist)
+        MusicPlayerWidgetProvider.updateAllWidgets(getApplication())
+    }
+
+    private fun persistPlayerWidgetState(title: String, artist: String) {
+        val prefs = getApplication<Application>().getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("title", title)
+            .putString("artist", artist)
+            .putFloat("current_time", currentTime)
+            .putFloat("duration", duration)
+            .putBoolean("is_playing", isPlaying)
+            .putBoolean("is_loading", isPlayerLoading)
+            .putBoolean("is_shuffle", isShuffleMode)
+            .putInt("repeat_mode", repeatMode.ordinal)
+            .putBoolean("is_favorite", isFavorite)
+            .apply()
     }
 
     private fun stopMusicService() {
@@ -788,7 +816,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         playbackJob?.cancel()
         mediaPlayer?.pause()
         stopMusicService()
-        LibraryWidgetProvider.updateAllWidgets(getApplication())
+        persistPlayerWidgetState("No song selected", "")
+        MusicPlayerWidgetProvider.updateAllWidgets(getApplication())
     }
 
     fun getCurrentSong(): Track? {

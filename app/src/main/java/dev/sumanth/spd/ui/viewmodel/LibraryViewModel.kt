@@ -6,7 +6,7 @@ import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sumanth.spd.model.LocalSong
-import dev.sumanth.spd.service.LibraryWidgetProvider
+import dev.sumanth.spd.service.MusicPlayerWidgetProvider
 import dev.sumanth.spd.utils.LibraryScanner
 import dev.sumanth.spd.utils.SharedPref
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -116,7 +116,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 persistWidgetState(false)
             } finally {
                 _isScanning.value = false
-                LibraryWidgetProvider.updateAllWidgets(getApplication())
+                MusicPlayerWidgetProvider.updateAllWidgets(getApplication())
             }
         }
     }

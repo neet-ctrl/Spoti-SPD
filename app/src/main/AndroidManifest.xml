@@ -53,7 +53,7 @@
             android:foregroundServiceType="mediaPlayback" />
 
         <receiver
-            android:name=".service.LibraryWidgetProvider"
+            android:name=".service.MusicPlayerWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
