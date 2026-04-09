@@ -72,6 +72,26 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                     if (isShuffle) android.R.drawable.ic_menu_rotate else android.R.drawable.ic_media_rew
                 )
                 setImageViewResource(
+                    R.id.widget_seek_backward,
+                    android.R.drawable.ic_media_rew
+                )
+                setImageViewResource(
+                    R.id.widget_prev,
+                    android.R.drawable.ic_media_previous
+                )
+                setImageViewResource(
+                    R.id.widget_play_pause,
+                    if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+                )
+                setImageViewResource(
+                    R.id.widget_next,
+                    android.R.drawable.ic_media_next
+                )
+                setImageViewResource(
+                    R.id.widget_seek_forward,
+                    android.R.drawable.ic_media_ff
+                )
+                setImageViewResource(
                     R.id.widget_repeat,
                     if (repeatMode == 1) android.R.drawable.ic_popup_sync else android.R.drawable.ic_menu_rotate
                 )
@@ -81,9 +101,11 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 )
                 setTextViewText(R.id.widget_status, if (isLoading) "Loading..." else "Library mode")
                 setOnClickPendingIntent(R.id.widget_shuffle, buildControlIntent(context, MusicPlayerService.ACTION_SHUFFLE))
+                setOnClickPendingIntent(R.id.widget_seek_backward, buildControlIntent(context, MusicPlayerService.ACTION_SEEK_BACKWARD))
                 setOnClickPendingIntent(R.id.widget_prev, buildControlIntent(context, MusicPlayerService.ACTION_PREV))
                 setOnClickPendingIntent(R.id.widget_play_pause, buildControlIntent(context, MusicPlayerService.ACTION_PLAY_PAUSE))
                 setOnClickPendingIntent(R.id.widget_next, buildControlIntent(context, MusicPlayerService.ACTION_NEXT))
+                setOnClickPendingIntent(R.id.widget_seek_forward, buildControlIntent(context, MusicPlayerService.ACTION_SEEK_FORWARD))
                 setOnClickPendingIntent(R.id.widget_repeat, buildControlIntent(context, MusicPlayerService.ACTION_REPEAT))
                 setOnClickPendingIntent(R.id.widget_favorite, buildControlIntent(context, MusicPlayerService.ACTION_TOGGLE_FAVORITE))
                 setOnClickPendingIntent(R.id.widget_refresh, buildRefreshIntent(context))

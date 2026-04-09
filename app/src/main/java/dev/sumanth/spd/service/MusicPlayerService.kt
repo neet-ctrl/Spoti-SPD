@@ -150,7 +150,7 @@ class MusicPlayerService : Service() {
 
     private fun bringAppToForeground() {
         val mainActivityIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_BRING_TO_FRONT
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_BRING_TO_FRONT or Intent.FLAG_ACTIVITY_NEW_TASK
         }
         startActivity(mainActivityIntent)
     }
