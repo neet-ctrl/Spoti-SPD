@@ -36,7 +36,10 @@ class SongPickerDialogActivity : ComponentActivity() {
                             index
                         )
                         showDialog = false
-                        finish()
+                        // Add delay to ensure playback coroutine is initiated before activity finishes
+                        window.decorView.postDelayed({
+                            finish()
+                        }, 300)
                     },
                     onDismiss = {
                         showDialog = false

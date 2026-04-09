@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
@@ -734,6 +735,21 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         localPlaybackList.addAll(songs)
         isLocalPlayback = true
         currentPlayingIndex = -1
+        
+        // Save songs to widget list preferences so widget can display them
+        val songsJson = JSONArray().apply {
+            songs.forEach { song ->
+                put(org.json.JSONObject().apply {
+                    put("title", song.title)
+                    put("artist", song.artist)
+                    put("filePath", song.filePath)
+                    put("duration", 0L) // Duration can be 0 for now
+                })
+            }
+        }
+        WidgetSongListFactory.saveSongsToPrefs(getApplication(), songsJson.toString())
+        WidgetSongListFactory.saveCurrentIndex(getApplication(), startIndex)
+        
         playLocalAtIndex(startIndex)
     }
 
@@ -751,6 +767,26 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.Main) {
+                    // Request audio focus before playback
+                    val audioManager = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    val focusResult = audioManager.requestAudioFocus(
+                        { focusChange ->
+                            if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                                mediaPlayer?.pause()
+                            } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                                mediaPlayer?.pause()
+                            }
+                        },
+                        AudioManager.STREAM_MUSIC,
+                        AudioManager.AUDIOFOCUS_GAIN
+                    )
+                    
+                    if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                        Toast.makeText(getApplication(), "Could not get audio focus", Toast.LENGTH_SHORT).show()
+                        isPlayerLoading = false
+                        return@withContext
+                    }
+                    
                     mediaPlayer?.release()
                     mediaPlayer = android.media.MediaPlayer().apply {
                         setDataSource(item.filePath)
