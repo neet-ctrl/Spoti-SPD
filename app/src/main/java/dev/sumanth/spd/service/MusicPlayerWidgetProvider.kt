@@ -7,8 +7,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
+import dev.sumanth.spd.SongPickerDialogActivity
 import dev.sumanth.spd.service.MusicPlayerService
 
 class MusicPlayerWidgetProvider : AppWidgetProvider() {
@@ -120,9 +120,9 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         }
 
         private fun buildPickSongIntent(context: Context): PendingIntent {
-            val intent = Intent(context, MainActivity::class.java).apply {
+            val intent = Intent(context, SongPickerDialogActivity::class.java).apply {
                 action = ACTION_PICK_SONG
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             return PendingIntent.getActivity(
                 context,

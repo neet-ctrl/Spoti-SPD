@@ -47,6 +47,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SongPickerDialogActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.SpotifyPlaylistDownloader.Dialog" />
+
         <service
             android:name=".service.MusicPlayerService"
             android:exported="false"
