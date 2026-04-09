@@ -123,12 +123,31 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 }
                 _songs.value = songs
                 persistWidgetState(false)
+                
+                // Save songs to widget list preferences for widget display
+                val songsJson = JSONArray().apply {
+                    songs.forEach { song ->
+                        put(org.json.JSONObject().apply {
+                            put("title", song.title)
+                            put("artist", song.artist)
+                            put("filePath", song.filePath)
+                            put("duration", song.duration)
+                        })
+                    }
+                }
+                WidgetSongListFactory.saveSongsToPrefs(getApplication(), songsJson.toString())
+                // Reset current index since the list changed
+                WidgetSongListFactory.saveCurrentIndex(getApplication(), -1)
             } catch (e: Exception) {
                 _scanError.value = e.message
                 persistWidgetState(false)
             } finally {
                 _isScanning.value = false
                 MusicPlayerWidgetProvider.updateAllWidgets(getApplication())
+                
+                // Clear loading state in player widget prefs
+                val playerPrefs = getApplication<Application>().getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
+                playerPrefs.edit().putBoolean("is_loading", false).apply()
             }
         }
     }

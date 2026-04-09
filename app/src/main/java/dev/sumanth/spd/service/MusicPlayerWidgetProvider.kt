@@ -169,6 +169,16 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         }
+
+        private fun buildControlIntent(context: Context, action: String): PendingIntent {
+            val intent = Intent(context, MusicPlayerService::class.java).apply { this.action = action }
+            return PendingIntent.getService(
+                context,
+                action.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -180,9 +190,14 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
         when (intent.action) {
             ACTION_REFRESH_LIBRARY -> {
-                // Start the refresh service with current scan mode
+                // Set loading state and start the refresh service with current scan mode
                 val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 val scanMode = prefs.getBoolean(KEY_SCAN_MODE, false)
+                
+                // Set loading state in player widget prefs
+                val playerPrefs = context.getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
+                playerPrefs.edit().putBoolean("is_loading", true).apply()
+                
                 val serviceIntent = Intent(context, LibraryRefreshService::class.java).apply {
                     putExtra(LibraryRefreshService.EXTRA_SCAN_MODE, scanMode)
                 }
