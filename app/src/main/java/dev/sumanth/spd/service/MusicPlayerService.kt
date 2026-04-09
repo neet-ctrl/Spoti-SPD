@@ -230,18 +230,18 @@ class MusicPlayerService : Service() {
                         .build()
                 )
                 setDataSource(song.filePath)
-                setOnPrepared { player ->
+                setOnPrepared { player: android.media.MediaPlayer ->
                     isLocalLoading = false
                     player.start()
                     val durationSeconds = (player.duration / 1000f).coerceAtLeast(0f)
                     updateServiceNotification(true, 0f, durationSeconds, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, true, false, 0f, durationSeconds)
                 }
-                setOnCompletion { player ->
+                setOnCompletion { player: android.media.MediaPlayer ->
                     updateServiceNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, getCurrentPlaybackPosition(), getCurrentDuration())
                 }
-                setOnError { _, what, extra ->
+                setOnError { mp: android.media.MediaPlayer, what: Int, extra: Int ->
                     updateServiceNotification(false, 0f, 0f, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, 0f, 0f)
                     false
@@ -340,6 +340,12 @@ class MusicPlayerService : Service() {
         } catch (e: Exception) {
             false
         }
+    }
+
+    private fun releaseLocalPlayer() {
+        localMediaPlayer?.reset()
+        localMediaPlayer?.release()
+        localMediaPlayer = null
     }
 
     private fun handleNext(): Boolean {
