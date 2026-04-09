@@ -261,8 +261,27 @@ class MusicPlayerService : Service() {
                     saveWidgetPlaybackState(song.title, song.artist, true, false, 0f, durationSeconds)
                 }
                 setOnCompletionListener { player: MediaPlayer ->
-                    updateAppNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
-                    saveWidgetPlaybackState(song.title, song.artist, false, false, getCurrentPlaybackPosition(), getCurrentDuration())
+                    when {
+                        localRepeatMode == 1 -> {
+                            player.seekTo(0)
+                            player.start()
+                        }
+                        localShuffleMode && localPlaybackList.size > 1 -> {
+                            val nextIndex = localPlaybackList.indices.filter { it != currentLocalIndex }.random()
+                            currentLocalIndex = nextIndex
+                            playLocalSong(localPlaybackList[nextIndex])
+                        }
+                        localRepeatMode == 2 -> {
+                            handleNext()
+                        }
+                        currentLocalIndex < localPlaybackList.size - 1 -> {
+                            handleNext()
+                        }
+                        else -> {
+                            updateAppNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
+                            saveWidgetPlaybackState(song.title, song.artist, false, false, getCurrentPlaybackPosition(), getCurrentDuration())
+                        }
+                    }
                 }
                 setOnErrorListener { mp: MediaPlayer, what: Int, extra: Int ->
                     updateAppNotification(false, 0f, 0f, false, song.title, song.artist)
@@ -299,7 +318,14 @@ class MusicPlayerService : Service() {
         duration: Float = getCurrentDuration(),
         isLoading: Boolean = false,
         title: String = getCurrentSongTitle(),
-        artist: String = getCurrentSongArtist()
+        artist: String = getCurrentSongArtist(),
+        shuffle: Boolean = localShuffleMode,
+        repeatMode: Int = localRepeatMode,
+        isFavorite: Boolean = false,
+        speed: Float = 1f,
+        volume: Float = 1f,
+        songPos: Int = currentLocalIndex,
+        songTotal: Int = localPlaybackList.size
     ) {
         val notification = buildNotification(
             title,
@@ -308,13 +334,13 @@ class MusicPlayerService : Service() {
             currentTime,
             duration,
             isLoading,
-            false,
-            0,
-            false,
-            1f,
-            1f,
-            currentLocalIndex,
-            localPlaybackList.size
+            shuffle,
+            repeatMode,
+            isFavorite,
+            speed,
+            volume,
+            songPos,
+            songTotal
         )
         startForeground(NOTIFICATION_ID, notification)
     }
@@ -325,7 +351,14 @@ class MusicPlayerService : Service() {
         duration: Float = getCurrentDuration(),
         isLoading: Boolean = false,
         title: String = getCurrentSongTitle(),
-        artist: String = getCurrentSongArtist()
+        artist: String = getCurrentSongArtist(),
+        shuffle: Boolean = localShuffleMode,
+        repeatMode: Int = localRepeatMode,
+        isFavorite: Boolean = false,
+        speed: Float = 1f,
+        volume: Float = 1f,
+        songPos: Int = currentLocalIndex,
+        songTotal: Int = localPlaybackList.size
     ) {
         LocalBroadcastManager.getInstance(this).sendBroadcast(
             Intent(ACTION_UPDATE_NOTIFICATION).apply {
@@ -336,9 +369,16 @@ class MusicPlayerService : Service() {
                 putExtra(EXTRA_IS_LOADING, isLoading)
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_ARTIST, artist)
+                putExtra(EXTRA_IS_SHUFFLE, shuffle)
+                putExtra(EXTRA_REPEAT_MODE, repeatMode)
+                putExtra(EXTRA_IS_FAVORITE, isFavorite)
+                putExtra(EXTRA_SPEED, speed)
+                putExtra(EXTRA_VOLUME, volume)
+                putExtra(EXTRA_SONG_POSITION, songPos)
+                putExtra(EXTRA_SONG_TOTAL, songTotal)
             }
         )
-        updateServiceNotification(isPlaying, currentTime, duration, isLoading, title, artist)
+        updateServiceNotification(isPlaying, currentTime, duration, isLoading, title, artist, shuffle, repeatMode, isFavorite, speed, volume, songPos, songTotal)
     }
 
     private fun saveWidgetPlaybackState(
@@ -400,18 +440,32 @@ class MusicPlayerService : Service() {
 
     private fun handleNext(): Boolean {
         if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
-        val nextIndex = if (currentLocalIndex < localPlaybackList.size - 1) currentLocalIndex + 1 else 0
-        val nextSong = localPlaybackList[nextIndex]
+        val nextIndex = when {
+            localShuffleMode && localPlaybackList.size > 1 -> {
+                localPlaybackList.indices.filter { it != currentLocalIndex }.random()
+            }
+            currentLocalIndex < localPlaybackList.size - 1 -> currentLocalIndex + 1
+            localRepeatMode == 2 -> 0
+            else -> return false
+        }
         currentLocalIndex = nextIndex
+        val nextSong = localPlaybackList[nextIndex]
         playLocalSong(nextSong)
         return true
     }
 
     private fun handlePrev(): Boolean {
         if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
-        val prevIndex = if (currentLocalIndex > 0) currentLocalIndex - 1 else localPlaybackList.size - 1
-        val prevSong = localPlaybackList[prevIndex]
+        val prevIndex = when {
+            localShuffleMode && localPlaybackList.size > 1 -> {
+                localPlaybackList.indices.filter { it != currentLocalIndex }.random()
+            }
+            currentLocalIndex > 0 -> currentLocalIndex - 1
+            localRepeatMode == 2 -> localPlaybackList.size - 1
+            else -> return false
+        }
         currentLocalIndex = prevIndex
+        val prevSong = localPlaybackList[prevIndex]
         playLocalSong(prevSong)
         return true
     }
@@ -454,6 +508,7 @@ class MusicPlayerService : Service() {
         localPlaybackList.clear()
         currentLocalIndex = -1
         isLocalLoading = false
+        updateAppNotification(false, 0f, 0f, false, "No song selected", "")
         saveWidgetPlaybackState("No song selected", "", false, false, 0f, 0f)
         return true
     }
@@ -461,14 +516,18 @@ class MusicPlayerService : Service() {
     private fun handleShuffle(): Boolean {
         if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
         localShuffleMode = !localShuffleMode
-        saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), localMediaPlayer?.isPlaying ?: false, false, getCurrentPlaybackPosition(), getCurrentDuration(), localShuffleMode, localRepeatMode)
+        val playing = localMediaPlayer?.isPlaying ?: false
+        saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), playing, false, getCurrentPlaybackPosition(), getCurrentDuration(), localShuffleMode, localRepeatMode)
+        updateAppNotification(playing, getCurrentPlaybackPosition(), getCurrentDuration(), false, getCurrentSongTitle(), getCurrentSongArtist(), localShuffleMode, localRepeatMode)
         return true
     }
 
     private fun handleRepeat(): Boolean {
         if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
         localRepeatMode = (localRepeatMode + 1) % 3
-        saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), localMediaPlayer?.isPlaying ?: false, false, getCurrentPlaybackPosition(), getCurrentDuration(), localShuffleMode, localRepeatMode)
+        val playing = localMediaPlayer?.isPlaying ?: false
+        saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), playing, false, getCurrentPlaybackPosition(), getCurrentDuration(), localShuffleMode, localRepeatMode)
+        updateAppNotification(playing, getCurrentPlaybackPosition(), getCurrentDuration(), false, getCurrentSongTitle(), getCurrentSongArtist(), localShuffleMode, localRepeatMode)
         return true
     }
 
@@ -498,6 +557,14 @@ class MusicPlayerService : Service() {
             ACTION_SEEK_BACKWARD -> {
                 if (!handleSeekBackward()) {
                     dispatchAction(ACTION_SEEK_BACKWARD)
+                }
+            }
+            ACTION_SEEK_TO -> {
+                val seekPosition = intent?.getFloatExtra(EXTRA_SEEK_POSITION, -1f) ?: -1f
+                if (seekPosition >= 0f) {
+                    if (!handleSeekTo(seekPosition)) {
+                        dispatchAction(ACTION_SEEK_TO)
+                    }
                 }
             }
             ACTION_CLOSE -> {
@@ -680,6 +747,7 @@ class MusicPlayerService : Service() {
             .setShowWhen(false)
             .setSilent(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setProgress(100, progressPct, false)
             .addAction(R.drawable.ic_fast_rewind_widget, "Rewind", seekBackIntent)
             .addAction(R.drawable.ic_skip_prev_widget, "Previous", prevIntent)
             .addAction(

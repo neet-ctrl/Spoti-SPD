@@ -93,11 +93,19 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     // Service playback state for unified notifications
     var isServicePlaying by mutableStateOf(false)
+    var isServiceNotificationActive by mutableStateOf(false)
     var serviceTitle by mutableStateOf("")
     var serviceArtist by mutableStateOf("")
     var serviceCurrentTime by mutableFloatStateOf(0f)
     var serviceDuration by mutableFloatStateOf(0f)
     var serviceIsLoading by mutableStateOf(false)
+    var serviceIsShuffle by mutableStateOf(false)
+    var serviceRepeatMode by mutableStateOf(0)
+    var serviceIsFavorite by mutableStateOf(false)
+    var serviceSpeed by mutableFloatStateOf(1f)
+    var serviceVolume by mutableFloatStateOf(1f)
+    var serviceSongPosition by mutableStateOf(-1)
+    var serviceSongTotal by mutableStateOf(0)
 
     val currentLocalFilePath: String?
         get() = if (isLocalPlayback && currentLocalIndex in localPlaybackList.indices)
@@ -145,7 +153,28 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     val isLoading = intent?.getBooleanExtra(MusicPlayerService.EXTRA_IS_LOADING, false) ?: false
                     val title = intent?.getStringExtra(MusicPlayerService.EXTRA_TITLE) ?: ""
                     val artist = intent?.getStringExtra(MusicPlayerService.EXTRA_ARTIST) ?: ""
-                    updateNotificationFromService(isPlaying, currentTime, duration, isLoading, title, artist)
+                    val isShuffle = intent?.getBooleanExtra(MusicPlayerService.EXTRA_IS_SHUFFLE, false) ?: false
+                    val repeatMode = intent?.getIntExtra(MusicPlayerService.EXTRA_REPEAT_MODE, 0) ?: 0
+                    val isFavorite = intent?.getBooleanExtra(MusicPlayerService.EXTRA_IS_FAVORITE, false) ?: false
+                    val speed = intent?.getFloatExtra(MusicPlayerService.EXTRA_SPEED, 1f) ?: 1f
+                    val volume = intent?.getFloatExtra(MusicPlayerService.EXTRA_VOLUME, 1f) ?: 1f
+                    val songPosition = intent?.getIntExtra(MusicPlayerService.EXTRA_SONG_POSITION, -1) ?: -1
+                    val songTotal = intent?.getIntExtra(MusicPlayerService.EXTRA_SONG_TOTAL, 0) ?: 0
+                    updateNotificationFromService(
+                        isPlaying,
+                        currentTime,
+                        duration,
+                        isLoading,
+                        title,
+                        artist,
+                        isShuffle,
+                        repeatMode,
+                        isFavorite,
+                        speed,
+                        volume,
+                        songPosition,
+                        songTotal
+                    )
                 }
             }
         }
@@ -234,7 +263,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         val duration: Float
         val isLoading: Boolean
 
-        if (isServicePlaying) {
+        if (isServiceNotificationActive) {
             // Use service state for unified notification
             title = serviceTitle
             artist = serviceArtist
@@ -253,8 +282,13 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             isLoading = this.isPlayerLoading
         }
 
-        val songPos = if (isLocalPlayback) currentLocalIndex else -1
-        val songTotal = if (isLocalPlayback) localPlaybackList.size else 0
+        val songPos = if (isServiceNotificationActive) serviceSongPosition else if (isLocalPlayback) currentLocalIndex else -1
+        val songTotal = if (isServiceNotificationActive) serviceSongTotal else if (isLocalPlayback) localPlaybackList.size else 0
+        val isShuffle = if (isServiceNotificationActive) serviceIsShuffle else isShuffleMode
+        val repeatModeOrdinal = if (isServiceNotificationActive) serviceRepeatMode else repeatMode.ordinal
+        val favorite = if (isServiceNotificationActive) serviceIsFavorite else isFavorite
+        val speed = if (isServiceNotificationActive) serviceSpeed else playbackSpeed
+        val volume = if (isServiceNotificationActive) serviceVolume else _volume
         val intent = MusicPlayerService.buildUpdateIntent(
             getApplication(),
             title,
@@ -263,11 +297,11 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             currentTime,
             duration,
             isLoading,
-            isShuffleMode,
-            repeatMode.ordinal,
-            isFavorite,
-            speed = playbackSpeed,
-            volume = _volume,
+            isShuffle,
+            repeatModeOrdinal,
+            favorite,
+            speed = speed,
+            volume = volume,
             songPosition = songPos,
             songTotal = songTotal
         )
@@ -282,24 +316,29 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         duration: Float,
         isLoading: Boolean,
         title: String,
-        artist: String
+        artist: String,
+        isShuffle: Boolean,
+        repeatMode: Int,
+        isFavorite: Boolean,
+        speed: Float,
+        volume: Float,
+        songPosition: Int,
+        songTotal: Int
     ) {
-        if (isPlaying) {
-            isServicePlaying = true
-            serviceTitle = title
-            serviceArtist = artist
-            serviceCurrentTime = currentTime
-            serviceDuration = duration
-            serviceIsLoading = isLoading
-        } else {
-            isServicePlaying = false
-            // Clear service state when not playing
-            serviceTitle = ""
-            serviceArtist = ""
-            serviceCurrentTime = 0f
-            serviceDuration = 0f
-            serviceIsLoading = false
-        }
+        isServiceNotificationActive = true
+        isServicePlaying = isPlaying
+        serviceTitle = title
+        serviceArtist = artist
+        serviceCurrentTime = currentTime
+        serviceDuration = duration
+        serviceIsLoading = isLoading
+        serviceIsShuffle = isShuffle
+        serviceRepeatMode = repeatMode
+        serviceIsFavorite = isFavorite
+        serviceSpeed = speed
+        serviceVolume = volume
+        serviceSongPosition = songPosition
+        serviceSongTotal = songTotal
         updateMusicNotification()
     }
 
@@ -842,6 +881,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         if (index !in localPlaybackList.indices) return
         currentLocalIndex = index
         showPlayer = true
+        isServiceNotificationActive = false
         isPlaying = false
         isPlayerLoading = true
         currentTime = 0f
@@ -975,6 +1015,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             return
         }
 
+        stopServicePlayback()
+        isServiceNotificationActive = false
         isLocalPlayback = false
         currentLocalIndex = -1
         currentPlayingIndex = index
@@ -1009,6 +1051,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                             this@HomeScreenViewModel.currentTime = 0f
                             this@HomeScreenViewModel.isPlayerLoading = false
                             this@HomeScreenViewModel.isServicePlaying = false
+                            this@HomeScreenViewModel.isServiceNotificationActive = false
+                            this@HomeScreenViewModel.isServiceNotificationActive = false
                             this@HomeScreenViewModel.isPlaying = true
                             mp.start()
                             this@HomeScreenViewModel.startPlaybackProgressUpdater()
@@ -1085,6 +1129,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 } else {
                     player.start()
                     isServicePlaying = false
+                    isServiceNotificationActive = false
                     isPlaying = true
                     startPlaybackProgressUpdater()
                 }
@@ -1152,6 +1197,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         currentPlayingIndex = -1
         currentLocalIndex = -1
         isLocalPlayback = false
+        isServiceNotificationActive = false
         localPlaybackList.clear()
         playbackJob?.cancel()
         if (mediaPlayer?.isPlaying == true) {
@@ -1229,6 +1275,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         isPlayerLoading = false
         showPlayer = false
         isLocalPlayback = false
+        isServiceNotificationActive = false
         currentPlayingIndex = -1
         currentLocalIndex = -1
         updateMusicNotification()
