@@ -60,8 +60,6 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             val remoteViews = RemoteViews(context.packageName, R.layout.widget_music_player).apply {
                 setTextViewText(R.id.widget_title, title)
                 setTextViewText(R.id.widget_artist, artist)
-                setTextViewText(R.id.widget_current_time, "%d:%02d".format((currentTime.toInt() / 60), currentTime.toInt() % 60))
-                setTextViewText(R.id.widget_total_duration, "%d:%02d".format((duration.toInt() / 60), duration.toInt() % 60))
                 setProgressBar(R.id.widget_progress, 100, progress, false)
                 setImageViewResource(
                     R.id.widget_play_pause,
