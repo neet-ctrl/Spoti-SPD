@@ -174,4 +174,14 @@
             android:maxLines="1"
             android:ellipsize="end" />
     </LinearLayout>
+
+    <ListView
+        android:id="@+id/widget_song_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="12dp"
+        android:cacheColorHint="#121212"
+        android:divider="@drawable/widget_divider"
+        android:dividerHeight="1dp" />
 </LinearLayout>

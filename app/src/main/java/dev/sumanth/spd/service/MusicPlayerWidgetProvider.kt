@@ -25,6 +25,8 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         private const val KEY_IS_SHUFFLE = "is_shuffle"
         private const val KEY_REPEAT_MODE = "repeat_mode"
         private const val KEY_IS_FAVORITE = "is_favorite"
+        
+        private const val REQUEST_CODE_SONG_CLICK = 999
 
         const val ACTION_REFRESH_LIBRARY = "dev.sumanth.spd.ACTION_REFRESH_LIBRARY"
         const val ACTION_OPEN_LIBRARY = "dev.sumanth.spd.ACTION_OPEN_LIBRARY"
@@ -90,6 +92,23 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_refresh, buildRefreshIntent(context))
                 setOnClickPendingIntent(R.id.widget_progress, buildOpenLibraryIntent(context, false))
                 setOnClickPendingIntent(R.id.widget_root, buildOpenLibraryIntent(context, false))
+                
+                // Set up remote adapter for song list
+                val intent = Intent(context, WidgetSongListService::class.java)
+                setRemoteAdapter(R.id.widget_song_list, intent)
+                
+                // Set up pending intent template for song list item clicks
+                val songClickIntent = Intent(context, MusicPlayerService::class.java).apply {
+                    action = MusicPlayerService.ACTION_PLAY_SONG_INDEX
+                    flags = Intent.FLAG_UPDATE_CURRENT
+                }
+                val songClickTemplate = PendingIntent.getService(
+                    context,
+                    REQUEST_CODE_SONG_CLICK,
+                    songClickIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                )
+                setPendingIntentTemplate(R.id.widget_song_list, songClickTemplate)
             }
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
         }
