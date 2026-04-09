@@ -35,16 +35,16 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _favorites = MutableStateFlow(setOf<String>())
     private val _scanError = MutableStateFlow<String?>(null)
     private val _scanWholeStorage = MutableStateFlow(false)
+    private val _libraryScanPath = MutableStateFlow(sharedPref.getLibraryScanPath())
     val scanWholeStorage: StateFlow<Boolean> = _scanWholeStorage.asStateFlow()
 
-    val scanPath: StateFlow<String> = _scanWholeStorage
-        .map { scanWhole ->
-            if (scanWhole) {
-                Environment.getExternalStorageDirectory().absolutePath
-            } else {
-                sharedPref.getLibraryScanPath()
-            }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), sharedPref.getLibraryScanPath())
+    val scanPath: StateFlow<String> = combine(_scanWholeStorage, _libraryScanPath) { scanWhole, path ->
+        if (scanWhole) {
+            Environment.getExternalStorageDirectory().absolutePath
+        } else {
+            path
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _libraryScanPath.value)
 
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
     val scanProgress: StateFlow<Pair<Int, Int>> = _scanProgress.asStateFlow()
@@ -115,6 +115,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun setLibraryScanPath(path: String) {
         sharedPref.storeLibraryScanPath(path)
+        _libraryScanPath.value = path
         if (!_scanWholeStorage.value) {
             refresh()
         }
