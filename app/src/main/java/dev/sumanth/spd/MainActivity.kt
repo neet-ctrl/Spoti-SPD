@@ -15,7 +15,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import dev.sumanth.spd.model.LocalPlaybackItem
 import dev.sumanth.spd.model.NavigationItem
 import dev.sumanth.spd.ui.component.Background
 import dev.sumanth.spd.ui.component.BottomBar
@@ -93,6 +102,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_OPEN_LIBRARY = "dev.sumanth.spd.ACTION_OPEN_LIBRARY"
+        const val ACTION_PICK_SONG = "dev.sumanth.spd.ACTION_PICK_SONG"
         const val EXTRA_REFRESH_LIBRARY = "extra_refresh_library"
     }
 
@@ -107,6 +117,7 @@ class MainActivity : ComponentActivity() {
     private val homeViewModel: HomeScreenViewModel by viewModels()
     private val libraryViewModel: LibraryViewModel by viewModels()
     private val widgetIntentState = mutableStateOf<Intent?>(null)
+    private val showSongPickerState = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -194,6 +205,20 @@ class MainActivity : ComponentActivity() {
                     PermissionDialog(this@MainActivity)
                     UpdateDialog(updateViewModel)
 
+                    if (showSongPickerState.value) {
+                        SongPickerDialog(
+                            songs = libraryViewModel.songs,
+                            onSongSelected = { index ->
+                                val playlist = libraryViewModel.songs.map {
+                                    LocalPlaybackItem(it.filePath, it.title, it.artist)
+                                }
+                                homeViewModel.playLocalPlaylist(playlist, index)
+                                showSongPickerState.value = false
+                            },
+                            onDismiss = { showSongPickerState.value = false }
+                        )
+                    }
+
                     if (showCrashDialog) {
                         CrashDialog(
                             errorMessage = crashError ?: "Unknown error",
@@ -213,8 +238,107 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleWidgetIntent(intent: Intent?) {
-        if (intent?.action == ACTION_OPEN_LIBRARY) {
-            widgetIntentState.value = intent
+        when (intent?.action) {
+            ACTION_OPEN_LIBRARY -> widgetIntentState.value = intent
+            ACTION_PICK_SONG -> showSongPickerState.value = true
+        }
+    }
+}
+
+@Composable
+fun SongPickerDialog(
+    songs: List<LocalPlaybackItem>,
+    onSongSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.8f)
+                .padding(8.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Select Song",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                // Song list
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                ) {
+                    itemsIndexed(songs) { index, song ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSongSelected(index) }
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Serial number
+                            Text(
+                                "${index + 1}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.width(32.dp)
+                            )
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 16.dp)
+                            ) {
+                                Text(
+                                    song.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    song.artist,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "Play",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
