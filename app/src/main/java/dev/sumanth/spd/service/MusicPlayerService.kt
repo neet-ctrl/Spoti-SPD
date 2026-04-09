@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
 
@@ -29,6 +30,8 @@ class MusicPlayerService : Service() {
         const val ACTION_SHUFFLE = "dev.sumanth.spd.ACTION_SHUFFLE"
         const val ACTION_REPEAT = "dev.sumanth.spd.ACTION_REPEAT"
         const val ACTION_TOGGLE_FAVORITE = "dev.sumanth.spd.ACTION_TOGGLE_FAVORITE"
+        const val ACTION_SEEK_BACKWARD = "dev.sumanth.spd.ACTION_SEEK_BACKWARD"
+        const val ACTION_SEEK_FORWARD = "dev.sumanth.spd.ACTION_SEEK_FORWARD"
 
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_ARTIST = "extra_artist"
@@ -77,25 +80,39 @@ class MusicPlayerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_PLAY_PAUSE -> {
-                sendBroadcast(Intent(ACTION_PLAY_PAUSE))
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_PLAY_PAUSE).apply { setPackage(packageName) })
             }
             ACTION_NEXT -> {
-                sendBroadcast(Intent(ACTION_NEXT))
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_NEXT).apply { setPackage(packageName) })
             }
             ACTION_PREV -> {
-                sendBroadcast(Intent(ACTION_PREV))
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_PREV).apply { setPackage(packageName) })
             }
             ACTION_SHUFFLE -> {
-                sendBroadcast(Intent(ACTION_SHUFFLE))
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_SHUFFLE).apply { setPackage(packageName) })
             }
             ACTION_REPEAT -> {
-                sendBroadcast(Intent(ACTION_REPEAT))
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_REPEAT).apply { setPackage(packageName) })
             }
             ACTION_TOGGLE_FAVORITE -> {
-                sendBroadcast(Intent(ACTION_TOGGLE_FAVORITE))
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_TOGGLE_FAVORITE).apply { setPackage(packageName) })
+            }
+            ACTION_SEEK_BACKWARD -> {
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_SEEK_BACKWARD).apply { setPackage(packageName) })
+            }
+            ACTION_SEEK_FORWARD -> {
+                bringAppToForeground()
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_SEEK_FORWARD).apply { setPackage(packageName) })
             }
             ACTION_CLOSE -> {
-                sendBroadcast(Intent(ACTION_CLOSE))
+                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(ACTION_CLOSE).apply { setPackage(packageName) })
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                 } else {
@@ -129,6 +146,13 @@ class MusicPlayerService : Service() {
             }
         }
         return START_STICKY
+    }
+
+    private fun bringAppToForeground() {
+        val mainActivityIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_BRING_TO_FRONT
+        }
+        startActivity(mainActivityIntent)
     }
 
     private fun buildNotification(
@@ -186,6 +210,18 @@ class MusicPlayerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val seekBackwardIntent = PendingIntent.getService(
+            this, 8,
+            Intent(this, MusicPlayerService::class.java).apply { action = ACTION_SEEK_BACKWARD },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val seekForwardIntent = PendingIntent.getService(
+            this, 9,
+            Intent(this, MusicPlayerService::class.java).apply { action = ACTION_SEEK_FORWARD },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val closeIntent = PendingIntent.getService(
             this, 4,
             Intent(this, MusicPlayerService::class.java).apply { action = ACTION_CLOSE },
@@ -223,12 +259,22 @@ class MusicPlayerService : Service() {
                 R.id.action_favorite,
                 if (isFavorite) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off
             )
+            setImageViewResource(
+                R.id.action_seek_backward,
+                android.R.drawable.ic_media_rew
+            )
+            setImageViewResource(
+                R.id.action_seek_forward,
+                android.R.drawable.ic_media_ff
+            )
             setOnClickPendingIntent(R.id.action_prev, prevIntent)
             setOnClickPendingIntent(R.id.action_play_pause, playPauseIntent)
             setOnClickPendingIntent(R.id.action_next, nextIntent)
             setOnClickPendingIntent(R.id.action_shuffle, shuffleIntent)
             setOnClickPendingIntent(R.id.action_repeat, repeatIntent)
             setOnClickPendingIntent(R.id.action_favorite, favoriteIntent)
+            setOnClickPendingIntent(R.id.action_seek_backward, seekBackwardIntent)
+            setOnClickPendingIntent(R.id.action_seek_forward, seekForwardIntent)
             setOnClickPendingIntent(R.id.notification_close, closeIntent)
             setOnClickPendingIntent(R.id.notification_root, openAppIntent)
             setInt(R.id.notification_root, "setBackgroundColor", Color.parseColor("#121212"))

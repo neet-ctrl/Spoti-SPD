@@ -77,4 +77,5 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.1.1")
     implementation("androidx.media3:media3-session:1.1.1")
     implementation("androidx.media:media:1.7.0")
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
 }

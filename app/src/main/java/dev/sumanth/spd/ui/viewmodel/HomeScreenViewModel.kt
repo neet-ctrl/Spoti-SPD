@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dev.sumanth.spd.model.DownloadHistoryItem
 import dev.sumanth.spd.model.DownloadStatus
 import dev.sumanth.spd.model.LocalPlaybackItem
@@ -106,6 +107,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 MusicPlayerService.ACTION_SHUFFLE -> toggleShuffle()
                 MusicPlayerService.ACTION_REPEAT -> toggleRepeatMode()
                 MusicPlayerService.ACTION_TOGGLE_FAVORITE -> toggleFavorite()
+                MusicPlayerService.ACTION_SEEK_BACKWARD -> seekBy(-10f)
+                MusicPlayerService.ACTION_SEEK_FORWARD -> seekBy(10f)
                 MusicPlayerService.ACTION_CLOSE -> closePlayer()
             }
         }
@@ -124,13 +127,11 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             addAction(MusicPlayerService.ACTION_SHUFFLE)
             addAction(MusicPlayerService.ACTION_REPEAT)
             addAction(MusicPlayerService.ACTION_TOGGLE_FAVORITE)
+            addAction(MusicPlayerService.ACTION_SEEK_BACKWARD)
+            addAction(MusicPlayerService.ACTION_SEEK_FORWARD)
             addAction(MusicPlayerService.ACTION_CLOSE)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            getApplication<Application>().registerReceiver(notificationActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            getApplication<Application>().registerReceiver(notificationActionReceiver, filter)
-        }
+        LocalBroadcastManager.getInstance(getApplication()).registerReceiver(notificationActionReceiver, filter)
     }
 
     private fun updateMusicNotification() {
@@ -804,6 +805,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     fun toggleShuffle() {
         isShuffleMode = !isShuffleMode
+        updateMusicNotification()
     }
 
     fun closePlayer() {
@@ -833,6 +835,11 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     fun seekTo(positionSeconds: Float) {
         currentTime = positionSeconds.coerceIn(0f, duration)
         mediaPlayer?.seekTo((currentTime * 1000).toInt())
+        updateMusicNotification()
+    }
+
+    fun seekBy(deltaSeconds: Float) {
+        seekTo((currentTime + deltaSeconds).coerceIn(0f, duration))
     }
 
     fun setVolume(newVolume: Float) {
@@ -846,10 +853,12 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             RepeatMode.ALL -> RepeatMode.ONE
             RepeatMode.ONE -> RepeatMode.NONE
         }
+        updateMusicNotification()
     }
 
     fun toggleFavorite() {
         isFavorite = !isFavorite
+        updateMusicNotification()
     }
 
     fun togglePlayerCollapse() {
@@ -869,7 +878,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     override fun onCleared() {
         super.onCleared()
         try {
-            getApplication<Application>().unregisterReceiver(notificationActionReceiver)
+            LocalBroadcastManager.getInstance(getApplication()).unregisterReceiver(notificationActionReceiver)
         } catch (e: Exception) {
             e.printStackTrace()
         }
