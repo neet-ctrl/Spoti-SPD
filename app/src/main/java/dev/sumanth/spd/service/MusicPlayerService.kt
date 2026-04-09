@@ -31,6 +31,7 @@ class MusicPlayerService : Service() {
 
         const val ACTION_UPDATE = "dev.sumanth.spd.ACTION_UPDATE"
         const val ACTION_UPDATE_NOTIFICATION = "dev.sumanth.spd.ACTION_UPDATE_NOTIFICATION"
+        const val ACTION_STOP_APP_PLAYER = "dev.sumanth.spd.ACTION_STOP_APP_PLAYER"
         const val ACTION_PLAY_PAUSE = "dev.sumanth.spd.ACTION_PLAY_PAUSE"
         const val ACTION_NEXT = "dev.sumanth.spd.ACTION_NEXT"
         const val ACTION_PREV = "dev.sumanth.spd.ACTION_PREV"
@@ -154,22 +155,14 @@ class MusicPlayerService : Service() {
                     MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
             )
             setCallback(object : MediaSessionCompat.Callback() {
-                override fun onPlay() = dispatchAction(ACTION_PLAY_PAUSE)
-                override fun onPause() = dispatchAction(ACTION_PLAY_PAUSE)
-                override fun onSkipToNext() = dispatchAction(ACTION_NEXT)
-                override fun onSkipToPrevious() = dispatchAction(ACTION_PREV)
-                override fun onFastForward() = dispatchAction(ACTION_SEEK_FORWARD)
-                override fun onRewind() = dispatchAction(ACTION_SEEK_BACKWARD)
-                override fun onSeekTo(pos: Long) {
-                    savePendingAction(this@MusicPlayerService, ACTION_SEEK_TO)
-                    LocalBroadcastManager.getInstance(this@MusicPlayerService).sendBroadcast(
-                        Intent(ACTION_SEEK_TO).apply {
-                            setPackage(packageName)
-                            putExtra(EXTRA_SEEK_POSITION, pos / 1000f)
-                        }
-                    )
-                }
-                override fun onStop() = dispatchAction(ACTION_CLOSE)
+                override fun onPlay() = handlePlayPause()
+            override fun onPause() = handlePlayPause()
+            override fun onSkipToNext() = handleNext()
+            override fun onSkipToPrevious() = handlePrev()
+            override fun onFastForward() = handleSeekForward()
+            override fun onRewind() = handleSeekBackward()
+            override fun onSeekTo(pos: Long) = handleSeekTo(pos / 1000f)
+            override fun onStop() = handleClose()
             })
             isActive = true
         }
@@ -220,6 +213,9 @@ class MusicPlayerService : Service() {
     }
 
     private fun playLocalSong(song: LocalPlaybackSong) {
+        LocalBroadcastManager.getInstance(this).sendBroadcast(
+            Intent(ACTION_STOP_APP_PLAYER).apply { setPackage(packageName) }
+        )
         releaseLocalPlayer()
         isLocalLoading = true
         updateAppNotification(false, 0f, 0f, true, song.title, song.artist)
@@ -319,6 +315,7 @@ class MusicPlayerService : Service() {
                 putExtra(EXTRA_ARTIST, artist)
             }
         )
+        updateServiceNotification(isPlaying, currentTime, duration, isLoading, title, artist)
     }
 
     private fun saveWidgetPlaybackState(
@@ -410,6 +407,17 @@ class MusicPlayerService : Service() {
     private fun handleSeekBackward(): Boolean {
         localMediaPlayer?.let {
             val newPos = (it.currentPosition - 10000).coerceAtLeast(0)
+            it.seekTo(newPos)
+            updateAppNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f, false, getCurrentSongTitle(), getCurrentSongArtist())
+            saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), it.isPlaying, false, newPos / 1000f, it.duration / 1000f)
+            return true
+        }
+        return false
+    }
+
+    private fun handleSeekTo(positionSeconds: Float): Boolean {
+        localMediaPlayer?.let {
+            val newPos = (positionSeconds * 1000).toInt().coerceIn(0, it.duration)
             it.seekTo(newPos)
             updateAppNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f, false, getCurrentSongTitle(), getCurrentSongArtist())
             saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), it.isPlaying, false, newPos / 1000f, it.duration / 1000f)

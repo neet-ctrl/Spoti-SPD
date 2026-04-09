@@ -128,6 +128,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     seekTo(pos)
                 }
                 MusicPlayerService.ACTION_CLOSE -> closePlayer()
+                MusicPlayerService.ACTION_STOP_APP_PLAYER -> stopAppPlayback()
                 MusicPlayerService.ACTION_PLAY_SONG_INDEX -> {
                     val idx = intent?.getIntExtra(MusicPlayerService.EXTRA_SONG_INDEX, -1) ?: -1
                     val handledByService = intent?.getBooleanExtra(MusicPlayerService.EXTRA_HANDLED_BY_SERVICE, false) ?: false
@@ -198,6 +199,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             addAction(MusicPlayerService.ACTION_VOLUME_UP)
             addAction(MusicPlayerService.ACTION_VOLUME_DOWN)
             addAction(MusicPlayerService.ACTION_EQUALIZER)
+            addAction(MusicPlayerService.ACTION_STOP_APP_PLAYER)
             addAction(MusicPlayerService.ACTION_UPDATE_NOTIFICATION)
         }
         LocalBroadcastManager.getInstance(getApplication()).registerReceiver(notificationActionReceiver, filter)
@@ -1211,6 +1213,24 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     fun toggleFavorite() {
         isFavorite = !isFavorite
+        updateMusicNotification()
+    }
+
+    private fun stopAppPlayback() {
+        playbackJob?.cancel()
+        try {
+            if (mediaPlayer?.isPlaying == true) {
+                mediaPlayer?.pause()
+            }
+            mediaPlayer?.release()
+        } catch (_: Exception) {}
+        mediaPlayer = null
+        isPlaying = false
+        isPlayerLoading = false
+        showPlayer = false
+        isLocalPlayback = false
+        currentPlayingIndex = -1
+        currentLocalIndex = -1
         updateMusicNotification()
     }
 
