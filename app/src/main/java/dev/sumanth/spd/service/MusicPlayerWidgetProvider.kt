@@ -25,12 +25,14 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         private const val KEY_IS_SHUFFLE = "is_shuffle"
         private const val KEY_REPEAT_MODE = "repeat_mode"
         private const val KEY_IS_FAVORITE = "is_favorite"
+        private const val KEY_SCAN_MODE = "scan_mode"  // true = whole storage, false = selected locations
         
         private const val REQUEST_CODE_SONG_CLICK = 999
 
         const val ACTION_REFRESH_LIBRARY = "dev.sumanth.spd.ACTION_REFRESH_LIBRARY"
         const val ACTION_OPEN_LIBRARY = "dev.sumanth.spd.ACTION_OPEN_LIBRARY"
         const val ACTION_PICK_SONG = "dev.sumanth.spd.ACTION_PICK_SONG"
+        const val ACTION_TOGGLE_SCAN_MODE = "dev.sumanth.spd.ACTION_TOGGLE_SCAN_MODE"
         const val EXTRA_REFRESH_LIBRARY = "extra_refresh_library"
 
         fun updateAllWidgets(context: Context) {
@@ -40,6 +42,8 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             if (ids.isEmpty()) return
             ids.forEach { appWidgetId ->
                 updateAppWidget(context, manager, appWidgetId)
+                // Notify that the list data has changed so RemoteViewsService refreshes
+                manager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_song_list)
             }
         }
 
@@ -54,6 +58,7 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             val isShuffle = prefs.getBoolean(KEY_IS_SHUFFLE, false)
             val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
             val isFavorite = prefs.getBoolean(KEY_IS_FAVORITE, false)
+            val scanMode = prefs.getBoolean(KEY_SCAN_MODE, false)  // false = selected locations, true = whole storage
 
             val progress = if (duration > 0f) {
                 ((currentTime.coerceIn(0f, duration) / duration) * 100).toInt()
@@ -81,7 +86,8 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                     R.id.widget_favorite,
                     if (isFavorite) android.R.drawable.btn_star_big_on else android.R.drawable.btn_star_big_off
                 )
-                setTextViewText(R.id.widget_status, if (isLoading) "Loading..." else "Library mode")
+                setTextViewText(R.id.widget_status, if (isLoading) "Loading..." else if (scanMode) "Whole storage" else "Selected locations")
+                setOnClickPendingIntent(R.id.widget_scan_toggle, buildScanToggleIntent(context))
                 setOnClickPendingIntent(R.id.widget_shuffle, buildControlIntent(context, MusicPlayerService.ACTION_SHUFFLE))
                 setOnClickPendingIntent(R.id.widget_prev, buildControlIntent(context, MusicPlayerService.ACTION_PREV))
                 setOnClickPendingIntent(R.id.widget_play_pause, buildControlIntent(context, MusicPlayerService.ACTION_PLAY_PAUSE))
@@ -152,11 +158,13 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             )
         }
 
-        private fun buildControlIntent(context: Context, action: String): PendingIntent {
-            val intent = Intent(context, MusicPlayerService::class.java).apply { this.action = action }
-            return PendingIntent.getService(
+        private fun buildScanToggleIntent(context: Context): PendingIntent {
+            val intent = Intent(context, MusicPlayerWidgetProvider::class.java).apply {
+                action = ACTION_TOGGLE_SCAN_MODE
+            }
+            return PendingIntent.getBroadcast(
                 context,
-                action.hashCode(),
+                3,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -172,7 +180,20 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
         when (intent.action) {
             ACTION_REFRESH_LIBRARY -> {
-                // Just refresh the widget display, don't scan or open app
+                // Start the refresh service with current scan mode
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val scanMode = prefs.getBoolean(KEY_SCAN_MODE, false)
+                val serviceIntent = Intent(context, LibraryRefreshService::class.java).apply {
+                    putExtra(LibraryRefreshService.EXTRA_SCAN_MODE, scanMode)
+                }
+                context.startService(serviceIntent)
+                updateAllWidgets(context)
+            }
+            ACTION_TOGGLE_SCAN_MODE -> {
+                // Toggle scan mode preference
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val currentScanMode = prefs.getBoolean(KEY_SCAN_MODE, false)
+                prefs.edit().putBoolean(KEY_SCAN_MODE, !currentScanMode).apply()
                 updateAllWidgets(context)
             }
             ACTION_OPEN_LIBRARY -> {

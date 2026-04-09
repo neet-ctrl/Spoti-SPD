@@ -32,6 +32,15 @@
             android:paddingStart="10dp" />
 
         <ImageView
+            android:id="@+id/widget_scan_toggle"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="6dp"
+            android:src="@android:drawable/ic_menu_rotate"
+            android:tint="#FFFFFF"
+            android:contentDescription="Scan mode toggle" />
+
+        <ImageView
             android:id="@+id/widget_refresh"
             android:layout_width="32dp"
             android:layout_height="32dp"
