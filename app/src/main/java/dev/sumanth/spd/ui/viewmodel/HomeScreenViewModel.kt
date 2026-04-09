@@ -91,6 +91,14 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     var currentLocalIndex by mutableStateOf(-1)
         private set
 
+    // Service playback state for unified notifications
+    var isServicePlaying by mutableStateOf(false)
+    var serviceTitle by mutableStateOf("")
+    var serviceArtist by mutableStateOf("")
+    var serviceCurrentTime by mutableFloatStateOf(0f)
+    var serviceDuration by mutableFloatStateOf(0f)
+    var serviceIsLoading by mutableStateOf(false)
+
     val currentLocalFilePath: String?
         get() = if (isLocalPlayback && currentLocalIndex in localPlaybackList.indices)
             localPlaybackList[currentLocalIndex].filePath
@@ -129,7 +137,15 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 MusicPlayerService.ACTION_VOLUME_UP -> adjustVolume(0.1f)
                 MusicPlayerService.ACTION_VOLUME_DOWN -> adjustVolume(-0.1f)
                 MusicPlayerService.ACTION_EQUALIZER -> openEqualizerIntent()
-            }
+                MusicPlayerService.ACTION_UPDATE_NOTIFICATION -> {
+                    val isPlaying = intent?.getBooleanExtra(MusicPlayerService.EXTRA_IS_PLAYING, false) ?: false
+                    val currentTime = intent?.getFloatExtra(MusicPlayerService.EXTRA_CURRENT_TIME, 0f) ?: 0f
+                    val duration = intent?.getFloatExtra(MusicPlayerService.EXTRA_DURATION, 0f) ?: 0f
+                    val isLoading = intent?.getBooleanExtra(MusicPlayerService.EXTRA_IS_LOADING, false) ?: false
+                    val title = intent?.getStringExtra(MusicPlayerService.EXTRA_TITLE) ?: ""
+                    val artist = intent?.getStringExtra(MusicPlayerService.EXTRA_ARTIST) ?: ""
+                    updateNotificationFromService(isPlaying, currentTime, duration, isLoading, title, artist)
+                }
         }
     }
 
@@ -210,17 +226,42 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun updateMusicNotification() {
-        val song = getCurrentSong() ?: return
+        val title: String
+        val artist: String
+        val isPlaying: Boolean
+        val currentTime: Float
+        val duration: Float
+        val isLoading: Boolean
+
+        if (isServicePlaying) {
+            // Use service state for unified notification
+            title = serviceTitle
+            artist = serviceArtist
+            isPlaying = this.isServicePlaying
+            currentTime = serviceCurrentTime
+            duration = serviceDuration
+            isLoading = serviceIsLoading
+        } else {
+            // Use ViewModel state
+            val song = getCurrentSong() ?: return
+            title = song.title
+            artist = song.artist
+            isPlaying = this.isPlaying
+            currentTime = this.currentTime
+            duration = this.duration
+            isLoading = this.isPlayerLoading
+        }
+
         val songPos = if (isLocalPlayback) currentLocalIndex else -1
         val songTotal = if (isLocalPlayback) localPlaybackList.size else 0
         val intent = MusicPlayerService.buildUpdateIntent(
             getApplication(),
-            song.title,
-            song.artist,
+            title,
+            artist,
             isPlaying,
             currentTime,
             duration,
-            isPlayerLoading,
+            isLoading,
             isShuffleMode,
             repeatMode.ordinal,
             isFavorite,
@@ -230,8 +271,35 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             songTotal = songTotal
         )
         getApplication<Application>().startService(intent)
-        persistPlayerWidgetState(song.title, song.artist)
+        persistPlayerWidgetState(title, artist)
         MusicPlayerWidgetProvider.updateAllWidgets(getApplication())
+    }
+
+    private fun updateNotificationFromService(
+        isPlaying: Boolean,
+        currentTime: Float,
+        duration: Float,
+        isLoading: Boolean,
+        title: String,
+        artist: String
+    ) {
+        if (isPlaying) {
+            isServicePlaying = true
+            serviceTitle = title
+            serviceArtist = artist
+            serviceCurrentTime = currentTime
+            serviceDuration = duration
+            serviceIsLoading = isLoading
+        } else {
+            isServicePlaying = false
+            // Clear service state when not playing
+            serviceTitle = ""
+            serviceArtist = ""
+            serviceCurrentTime = 0f
+            serviceDuration = 0f
+            serviceIsLoading = false
+        }
+        updateMusicNotification()
     }
 
     private fun persistPlayerWidgetState(title: String, artist: String) {
@@ -839,6 +907,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                                 this@HomeScreenViewModel.duration = mp.duration / 1000f
                                 this@HomeScreenViewModel.currentTime = 0f
                                 this@HomeScreenViewModel.isPlayerLoading = false
+                                this@HomeScreenViewModel.isServicePlaying = false
                                 this@HomeScreenViewModel.isPlaying = true
                                 mp.start()
                                 this@HomeScreenViewModel.startPlaybackProgressUpdater()
@@ -938,6 +1007,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                             this@HomeScreenViewModel.duration = mp.duration / 1000f
                             this@HomeScreenViewModel.currentTime = 0f
                             this@HomeScreenViewModel.isPlayerLoading = false
+                            this@HomeScreenViewModel.isServicePlaying = false
                             this@HomeScreenViewModel.isPlaying = true
                             mp.start()
                             this@HomeScreenViewModel.startPlaybackProgressUpdater()
@@ -1013,6 +1083,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     isPlaying = false
                 } else {
                     player.start()
+                    isServicePlaying = false
                     isPlaying = true
                     startPlaybackProgressUpdater()
                 }

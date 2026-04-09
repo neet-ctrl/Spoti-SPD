@@ -30,6 +30,7 @@ class MusicPlayerService : Service() {
         const val NOTIFICATION_ID = 1001
 
         const val ACTION_UPDATE = "dev.sumanth.spd.ACTION_UPDATE"
+        const val ACTION_UPDATE_NOTIFICATION = "dev.sumanth.spd.ACTION_UPDATE_NOTIFICATION"
         const val ACTION_PLAY_PAUSE = "dev.sumanth.spd.ACTION_PLAY_PAUSE"
         const val ACTION_NEXT = "dev.sumanth.spd.ACTION_NEXT"
         const val ACTION_PREV = "dev.sumanth.spd.ACTION_PREV"
@@ -206,11 +207,11 @@ class MusicPlayerService : Service() {
         localMediaPlayer?.let {
             if (it.isPlaying) {
                 it.pause()
-                updateServiceNotification(false)
+                updateAppNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, getCurrentSongTitle(), getCurrentSongArtist())
                 saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), false, false, getCurrentPlaybackPosition(), getCurrentDuration())
             } else {
                 it.start()
-                updateServiceNotification(true)
+                updateAppNotification(true, getCurrentPlaybackPosition(), getCurrentDuration(), false, getCurrentSongTitle(), getCurrentSongArtist())
                 saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), true, false, getCurrentPlaybackPosition(), getCurrentDuration())
             }
             return true
@@ -221,7 +222,7 @@ class MusicPlayerService : Service() {
     private fun playLocalSong(song: LocalPlaybackSong) {
         releaseLocalPlayer()
         isLocalLoading = true
-        updateServiceNotification(false, 0f, 0f, true, song.title, song.artist)
+        updateAppNotification(false, 0f, 0f, true, song.title, song.artist)
         saveWidgetPlaybackState(song.title, song.artist, false, true, 0f, 0f)
 
         try {
@@ -237,22 +238,22 @@ class MusicPlayerService : Service() {
                     isLocalLoading = false
                     player.start()
                     val durationSeconds = (player.duration / 1000f).coerceAtLeast(0f)
-                    updateServiceNotification(true, 0f, durationSeconds, false, song.title, song.artist)
+                    updateAppNotification(true, 0f, durationSeconds, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, true, false, 0f, durationSeconds)
                 }
                 setOnCompletionListener { player: MediaPlayer ->
-                    updateServiceNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
+                    updateAppNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, getCurrentPlaybackPosition(), getCurrentDuration())
                 }
                 setOnErrorListener { mp: MediaPlayer, what: Int, extra: Int ->
-                    updateServiceNotification(false, 0f, 0f, false, song.title, song.artist)
+                    updateAppNotification(false, 0f, 0f, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, 0f, 0f)
                     false
                 }
                 prepareAsync()
             }
         } catch (e: Exception) {
-            updateServiceNotification(false, 0f, 0f, false, song.title, song.artist)
+            updateAppNotification(false, 0f, 0f, false, song.title, song.artist)
             saveWidgetPlaybackState(song.title, song.artist, false, false, 0f, 0f)
         }
     }
@@ -297,6 +298,27 @@ class MusicPlayerService : Service() {
             localPlaybackList.size
         )
         startForeground(NOTIFICATION_ID, notification)
+    }
+
+    private fun updateAppNotification(
+        isPlaying: Boolean,
+        currentTime: Float = getCurrentPlaybackPosition(),
+        duration: Float = getCurrentDuration(),
+        isLoading: Boolean = false,
+        title: String = getCurrentSongTitle(),
+        artist: String = getCurrentSongArtist()
+    ) {
+        LocalBroadcastManager.getInstance(this).sendBroadcast(
+            Intent(ACTION_UPDATE_NOTIFICATION).apply {
+                setPackage(packageName)
+                putExtra(EXTRA_IS_PLAYING, isPlaying)
+                putExtra(EXTRA_CURRENT_TIME, currentTime)
+                putExtra(EXTRA_DURATION, duration)
+                putExtra(EXTRA_IS_LOADING, isLoading)
+                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_ARTIST, artist)
+            }
+        )
     }
 
     private fun saveWidgetPlaybackState(
@@ -378,7 +400,7 @@ class MusicPlayerService : Service() {
         localMediaPlayer?.let {
             val newPos = (it.currentPosition + 10000).coerceAtMost(it.duration)
             it.seekTo(newPos)
-            updateServiceNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f)
+            updateAppNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f, false, getCurrentSongTitle(), getCurrentSongArtist())
             saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), it.isPlaying, false, newPos / 1000f, it.duration / 1000f)
             return true
         }
@@ -389,7 +411,7 @@ class MusicPlayerService : Service() {
         localMediaPlayer?.let {
             val newPos = (it.currentPosition - 10000).coerceAtLeast(0)
             it.seekTo(newPos)
-            updateServiceNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f)
+            updateAppNotification(it.isPlaying, newPos / 1000f, it.duration / 1000f, false, getCurrentSongTitle(), getCurrentSongArtist())
             saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), it.isPlaying, false, newPos / 1000f, it.duration / 1000f)
             return true
         }
@@ -627,6 +649,7 @@ class MusicPlayerService : Service() {
             .setShowWhen(false)
             .setSilent(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(R.drawable.ic_fast_rewind_widget, "Rewind", seekBackIntent)
             .addAction(R.drawable.ic_skip_prev_widget, "Previous", prevIntent)
             .addAction(
                 if (isPlaying) R.drawable.ic_pause_widget else R.drawable.ic_play_widget,
@@ -635,6 +658,20 @@ class MusicPlayerService : Service() {
             )
             .addAction(R.drawable.ic_skip_next_widget, "Next", nextIntent)
             .addAction(R.drawable.ic_fast_forward_widget, "Forward", seekFwdIntent)
+            .addAction(
+                if (isShuffle) R.drawable.ic_shuffle_widget else R.drawable.ic_shuffle_widget,
+                "Shuffle",
+                shuffleIntent
+            )
+            .addAction(
+                when (repeatMode) {
+                    1 -> R.drawable.ic_repeat_one_widget
+                    2 -> R.drawable.ic_repeat_widget
+                    else -> R.drawable.ic_repeat_widget
+                },
+                "Repeat",
+                repeatIntent
+            )
 
         if (sessionToken != null) {
             builder.setStyle(
