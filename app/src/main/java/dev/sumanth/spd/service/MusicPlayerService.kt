@@ -155,14 +155,37 @@ class MusicPlayerService : Service() {
                     MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
             )
             setCallback(object : MediaSessionCompat.Callback() {
-                override fun onPlay() = handlePlayPause()
-            override fun onPause() = handlePlayPause()
-            override fun onSkipToNext() = handleNext()
-            override fun onSkipToPrevious() = handlePrev()
-            override fun onFastForward() = handleSeekForward()
-            override fun onRewind() = handleSeekBackward()
-            override fun onSeekTo(pos: Long) = handleSeekTo(pos / 1000f)
-            override fun onStop() = handleClose()
+                override fun onPlay() {
+                    handlePlayPause()
+                }
+
+                override fun onPause() {
+                    handlePlayPause()
+                }
+
+                override fun onSkipToNext() {
+                    handleNext()
+                }
+
+                override fun onSkipToPrevious() {
+                    handlePrev()
+                }
+
+                override fun onFastForward() {
+                    handleSeekForward()
+                }
+
+                override fun onRewind() {
+                    handleSeekBackward()
+                }
+
+                override fun onSeekTo(pos: Long) {
+                    handleSeekTo(pos / 1000f)
+                }
+
+                override fun onStop() {
+                    handleClose()
+                }
             })
             isActive = true
         }
