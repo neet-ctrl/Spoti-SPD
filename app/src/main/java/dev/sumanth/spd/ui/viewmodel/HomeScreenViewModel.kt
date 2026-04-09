@@ -20,7 +20,7 @@ import dev.sumanth.spd.model.DownloadStatus
 import dev.sumanth.spd.model.LocalPlaybackItem
 import dev.sumanth.spd.model.Track
 import dev.sumanth.spd.service.MusicPlayerService
-import dev.sumanth.spd.service.MusicPlayerWidgetProvider
+import dev.sumanth.spd.service.LibraryWidgetProvider
 import dev.sumanth.spd.utils.DownloadHistoryManager
 import dev.sumanth.spd.utils.DownloadManager
 import dev.sumanth.spd.utils.SharedPref
@@ -136,12 +136,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             isPlaying
         )
         getApplication<Application>().startService(intent)
-        MusicPlayerWidgetProvider.updateAllWidgets(
-            getApplication(),
-            song.title,
-            song.artist,
-            isPlaying
-        )
+        LibraryWidgetProvider.updateAllWidgets(getApplication())
     }
 
     private fun stopMusicService() {
@@ -793,12 +788,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         playbackJob?.cancel()
         mediaPlayer?.pause()
         stopMusicService()
-        MusicPlayerWidgetProvider.updateAllWidgets(
-            getApplication(),
-            "No song selected",
-            "",
-            false
-        )
+        LibraryWidgetProvider.updateAllWidgets(getApplication())
     }
 
     fun getCurrentSong(): Track? {
