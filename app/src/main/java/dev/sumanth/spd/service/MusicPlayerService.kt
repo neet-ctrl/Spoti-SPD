@@ -231,18 +231,18 @@ class MusicPlayerService : Service() {
                         .build()
                 )
                 setDataSource(song.filePath)
-                setOnPrepared { player: MediaPlayer ->
+                setOnPreparedListener { player: MediaPlayer ->
                     isLocalLoading = false
                     player.start()
                     val durationSeconds = (player.duration / 1000f).coerceAtLeast(0f)
                     updateServiceNotification(true, 0f, durationSeconds, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, true, false, 0f, durationSeconds)
                 }
-                setOnCompletion { player: MediaPlayer ->
+                setOnCompletionListener { player: MediaPlayer ->
                     updateServiceNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, getCurrentPlaybackPosition(), getCurrentDuration())
                 }
-                setOnError { mp: MediaPlayer, what: Int, extra: Int ->
+                setOnErrorListener { mp: MediaPlayer, what: Int, extra: Int ->
                     updateServiceNotification(false, 0f, 0f, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, 0f, 0f)
                     false
