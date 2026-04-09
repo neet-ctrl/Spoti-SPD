@@ -732,6 +732,10 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     fun playLocalPlaylist(songs: List<LocalPlaybackItem>, startIndex: Int) {
         if (songs.isEmpty() || startIndex !in songs.indices) return
+        
+        // Stop service playback before starting UI playback
+        stopServicePlayback()
+        
         localPlaybackList.clear()
         localPlaybackList.addAll(songs)
         isLocalPlayback = true
@@ -752,6 +756,17 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         WidgetSongListFactory.saveCurrentIndex(getApplication(), startIndex)
         
         playLocalAtIndex(startIndex)
+    }
+
+    private fun stopServicePlayback() {
+        val intent = Intent(getApplication(), MusicPlayerService::class.java).apply {
+            action = MusicPlayerService.ACTION_CLOSE
+        }
+        try {
+            getApplication<Application>().startForegroundService(intent)
+        } catch (e: Exception) {
+            // Ignore if service is not running
+        }
     }
 
     private fun playLocalAtIndex(index: Int) {

@@ -91,6 +91,14 @@ class WidgetSongListFactory(
         try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             currentIndex = prefs.getInt(KEY_CURRENT_INDEX, -1)
+            
+            // Also check player_widget_prefs for current playing index from service
+            val playerPrefs = context.getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
+            val serviceCurrentIndex = playerPrefs.getInt("current_playing_index", -1)
+            if (serviceCurrentIndex >= 0) {
+                currentIndex = serviceCurrentIndex
+            }
+            
             val jsonStr = prefs.getString(KEY_SONGS_JSON, null)
             if (jsonStr.isNullOrBlank()) {
                 isEmpty = true

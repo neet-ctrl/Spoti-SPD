@@ -126,6 +126,8 @@ class MusicPlayerService : Service() {
     private var currentLocalIndex = -1
     private var localMediaPlayer: MediaPlayer? = null
     private var isLocalLoading = false
+    private var localShuffleMode = false
+    private var localRepeatMode = 0 // 0=none, 1=one, 2=all
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -303,7 +305,9 @@ class MusicPlayerService : Service() {
         isPlaying: Boolean,
         isLoading: Boolean,
         currentTime: Float,
-        duration: Float
+        duration: Float,
+        shuffle: Boolean = localShuffleMode,
+        repeatMode: Int = localRepeatMode
     ) {
         val prefs = getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
         prefs.edit()
@@ -313,6 +317,9 @@ class MusicPlayerService : Service() {
             .putFloat("duration", duration)
             .putBoolean("is_playing", isPlaying)
             .putBoolean("is_loading", isLoading)
+            .putBoolean("is_shuffle", shuffle)
+            .putInt("repeat_mode", repeatMode)
+            .putInt("current_playing_index", currentLocalIndex)
             .apply()
         MusicPlayerWidgetProvider.updateAllWidgets(this)
     }
@@ -398,6 +405,20 @@ class MusicPlayerService : Service() {
         return true
     }
 
+    private fun handleShuffle(): Boolean {
+        if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
+        localShuffleMode = !localShuffleMode
+        saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), localMediaPlayer?.isPlaying ?: false, false, getCurrentPlaybackPosition(), getCurrentDuration(), localShuffleMode, localRepeatMode)
+        return true
+    }
+
+    private fun handleRepeat(): Boolean {
+        if (localPlaybackList.isEmpty() || currentLocalIndex < 0) return false
+        localRepeatMode = (localRepeatMode + 1) % 3
+        saveWidgetPlaybackState(getCurrentSongTitle(), getCurrentSongArtist(), localMediaPlayer?.isPlaying ?: false, false, getCurrentPlaybackPosition(), getCurrentDuration(), localShuffleMode, localRepeatMode)
+        return true
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_PLAY_PAUSE -> {
@@ -439,8 +460,16 @@ class MusicPlayerService : Service() {
                     stopSelf()
                 }
             }
-            ACTION_SHUFFLE,
-            ACTION_REPEAT,
+            ACTION_SHUFFLE -> {
+                if (!handleShuffle()) {
+                    dispatchAction(ACTION_SHUFFLE)
+                }
+            }
+            ACTION_REPEAT -> {
+                if (!handleRepeat()) {
+                    dispatchAction(ACTION_REPEAT)
+                }
+            }
             ACTION_TOGGLE_FAVORITE,
             ACTION_SPEED_CHANGE,
             ACTION_VOLUME_UP,
