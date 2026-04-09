@@ -22,6 +22,26 @@ class SharedPref(context: Context) {
         }
     }
 
+    fun getLibraryScanPath(): String {
+        return sharedPref.getString(KEY_LIBRARY_SCAN_PATH, null) ?: getDefaultDownloadPath()
+    }
+
+    fun storeLibraryScanPath(path: String) {
+        sharedPref.edit {
+            putString(KEY_LIBRARY_SCAN_PATH, path)
+        }
+    }
+
+    fun getScanWholeStorage(): Boolean {
+        return sharedPref.getBoolean(KEY_SCAN_WHOLE_STORAGE, false)
+    }
+
+    fun storeScanWholeStorage(enabled: Boolean) {
+        sharedPref.edit {
+            putBoolean(KEY_SCAN_WHOLE_STORAGE, enabled)
+        }
+    }
+
     fun getAutoUpdateCheck(): Boolean {
         return sharedPref.getBoolean(KEY_AUTO_UPDATE_CHECK, true)
     }
@@ -40,6 +60,8 @@ class SharedPref(context: Context) {
     companion object {
         private const val PREFS_NAME = "spd_settings"
         private const val KEY_DOWNLOAD_PATH = "download_path"
+        private const val KEY_LIBRARY_SCAN_PATH = "library_scan_path"
+        private const val KEY_SCAN_WHOLE_STORAGE = "scan_whole_storage"
         private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
         private const val DEFAULT_FOLDER_NAME = "spotify-playlist-downloader"
     }

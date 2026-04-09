@@ -2,6 +2,7 @@ package dev.sumanth.spd.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sumanth.spd.model.LocalSong
@@ -29,10 +30,16 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _songs = MutableStateFlow<List<LocalSong>>(emptyList())
     private val _isScanning = MutableStateFlow(false)
     private val _scanProgress = MutableStateFlow(Pair(0, 0))
-    private val _sortOrder = MutableStateFlow(LibrarySortOrder.DATE_ADDED)
-    private val _searchQuery = MutableStateFlow("")
-    private val _favorites = MutableStateFlow(setOf<String>())
-    private val _scanError = MutableStateFlow<String?>(null)
+    private val _scanWholeStorage = MutableStateFlow(false)
+    val scanWholeStorage: StateFlow<Boolean> = _scanWholeStorage.asStateFlow()
+
+    val scanPath: StateFlow<String> = combine(_scanWholeStorage) { scanWhole ->
+        if (scanWhole.first()) {
+            Environment.getExternalStorageDirectory().absolutePath
+        } else {
+            sharedPref.getLibraryScanPath()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), sharedPref.getLibraryScanPath())
 
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
     val scanProgress: StateFlow<Pair<Int, Int>> = _scanProgress.asStateFlow()
@@ -72,6 +79,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         loadFavorites()
+        _scanWholeStorage.value = sharedPref.getScanWholeStorage()
         refresh()
     }
 
@@ -81,8 +89,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             _scanProgress.value = Pair(0, 0)
             _scanError.value = null
             try {
-                val downloadPath = sharedPref.getDownloadPath()
-                val songs = scanner.scanDirectory(downloadPath) { processed, total ->
+                val path = scanPath.value
+                val songs = scanner.scanDirectory(path) { processed, total ->
                     _scanProgress.value = Pair(processed, total)
                 }
                 _songs.value = songs
@@ -94,8 +102,17 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun setSortOrder(order: LibrarySortOrder) {
-        _sortOrder.value = order
+    fun setScanWholeStorage(enabled: Boolean) {
+        _scanWholeStorage.value = enabled
+        sharedPref.storeScanWholeStorage(enabled)
+        refresh()
+    }
+
+    fun setLibraryScanPath(path: String) {
+        sharedPref.storeLibraryScanPath(path)
+        if (!_scanWholeStorage.value) {
+            refresh()
+        }
     }
 
     fun setSearchQuery(q: String) {

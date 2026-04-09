@@ -1,27 +1,11 @@
 package dev.sumanth.spd.ui.screen
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.EaseInOutCubic
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
+import android.content.Intent
+import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,8 +29,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
@@ -68,6 +54,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -92,6 +80,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -143,11 +132,15 @@ fun LibraryScreen(
     homeViewModel: HomeScreenViewModel,
     libraryViewModel: LibraryViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val songs by libraryViewModel.filteredSortedSongs.collectAsState()
     val isScanning by libraryViewModel.isScanning.collectAsState()
     val scanProgress by libraryViewModel.scanProgress.collectAsState()
     val sortOrder by libraryViewModel.sortOrder.collectAsState()
     val searchQuery by libraryViewModel.searchQuery.collectAsState()
+    val scanWholeStorage by libraryViewModel.scanWholeStorage.collectAsState()
+    val scanPath by libraryViewModel.scanPath.collectAsState()
+    val scanPath by libraryViewModel.scanPath.collectAsState()
     val totalDuration by libraryViewModel.totalDuration.collectAsState()
     val totalSize by libraryViewModel.totalSize.collectAsState()
     val songCount by libraryViewModel.songCount.collectAsState()
@@ -158,6 +151,25 @@ fun LibraryScreen(
 
     val sortSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let {
+            val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(it, takeFlags)
+
+            val segments = uri.path?.split(":")
+            if (segments != null && segments.size > 1) {
+                val folderPath = segments[1]
+                val storageBase = if (uri.path?.contains("primary") == true) {
+                    Environment.getExternalStorageDirectory().path
+                } else {
+                    "/storage/${segments[0].split("/").last()}"
+                }
+                val newPath = "$storageBase/$folderPath"
+                libraryViewModel.setLibraryScanPath(newPath)
+            }
+        }
+    }
 
     val infiniteTransitionFab = rememberInfiniteTransition(label = "fabSpin")
     val infiniteFabRotation by infiniteTransitionFab.animateFloat(
@@ -179,7 +191,11 @@ fun LibraryScreen(
                     totalDuration = totalDuration,
                     totalSize = totalSize,
                     isScanning = isScanning,
-                    scanProgress = scanProgress
+                    scanProgress = scanProgress,
+                    scanWholeStorage = scanWholeStorage,
+                    scanPath = scanPath,
+                    onScanWholeStorageChange = { libraryViewModel.setScanWholeStorage(it) },
+                    onChangeLocation = { launcher.launch(null) }
                 )
             }
 
@@ -309,7 +325,11 @@ private fun LibraryHeader(
     totalDuration: Long,
     totalSize: Long,
     isScanning: Boolean,
-    scanProgress: Pair<Int, Int>
+    scanProgress: Pair<Int, Int>,
+    scanWholeStorage: Boolean,
+    scanPath: String,
+    onScanWholeStorageChange: (Boolean) -> Unit,
+    onChangeLocation: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulse by infiniteTransition.animateFloat(
@@ -355,7 +375,7 @@ private fun LibraryHeader(
                         modifier = Modifier.size(28.dp)
                     )
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "My Library",
                         style = MaterialTheme.typography.headlineMedium,
@@ -367,6 +387,67 @@ private fun LibraryHeader(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        if (scanWholeStorage) "Whole Storage" else "Selected Folder",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Switch(
+                        checked = scanWholeStorage,
+                        onCheckedChange = onScanWholeStorageChange,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.Black,
+                            checkedTrackColor = SpotifyGreen,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                        )
+                    )
+                }
+            }
+
+            // Scan location display
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Folder,
+                        null,
+                        tint = SpotifyGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        if (scanWholeStorage) "Scanning: Whole Internal Storage"
+                        else "Scanning: ${scanPath.replace(Environment.getExternalStorageDirectory().path, "Internal Storage")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (!scanWholeStorage) {
+                        IconButton(
+                            onClick = onChangeLocation,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                null,
+                                tint = SpotifyGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
             }
 
