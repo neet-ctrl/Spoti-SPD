@@ -451,6 +451,82 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun downloadSelectedSongsIndividually() {
+        if (selectedSongs.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                appStatus = Status.DOWNLOADING
+                failedTracks.clear()
+                val downloadPath = sharedPref.getDownloadPath()
+
+                currentDownload = DownloadHistoryItem(
+                    spotifyUrl = spotifyLink,
+                    title = "Downloading selected songs",
+                    artist = "Multiple songs",
+                    totalTracks = selectedSongs.size,
+                    filePath = downloadPath,
+                    convertedToMp3 = convertToMp3,
+                    status = DownloadStatus.DOWNLOADING
+                )
+
+                var successCount = 0
+
+                selectedSongs.sorted().forEachIndexed { index, songIndex ->
+                    if (songIndex in 0 until spotifyList.length()) {
+                        val track = spotifyList.getJSONObject(songIndex)
+                        val trackName = track.getString("title")
+                        val artist = track.getString("artist")
+                        try {
+                            val fileMeta = withContext(Dispatchers.IO) {
+                                DownloadManager.getFileMeta(trackName, artist)
+                            }
+                            fileName = "Downloading ${index + 1}/${selectedSongs.size}: $trackName"
+                            val path = "$downloadPath/${sanitizeFilename(trackName)}"
+
+                            withContext(Dispatchers.IO) {
+                                DownloadManager.downloadFile(fileMeta.url, "$path.${fileMeta.extention}") { b, c ->
+                                    fileProgress = (b * 100 / c).toFloat() / 100
+                                }
+                                if (convertToMp3) {
+                                    DownloadManager.convertToMp3(path, fileMeta.extention, trackName, artist)
+                                } else {
+                                    DownloadManager.tagFile(path, fileMeta.extention, trackName, artist)
+                                }
+                            }
+
+                            totalProgress = (index + 1).toFloat() / selectedSongs.size
+                            successCount++
+                        } catch (e: Exception) {
+                            failedTracks.add(Track(trackName, artist))
+                            e.printStackTrace()
+                        }
+                    }
+                }
+
+                currentDownload?.let { download ->
+                    historyManager.addHistory(
+                        download.copy(
+                            status = if (failedTracks.isEmpty()) DownloadStatus.COMPLETED else DownloadStatus.PARTIAL,
+                            successfulTracks = successCount,
+                            failedTracks = failedTracks.size
+                        )
+                    )
+                }
+
+                loadHistory()
+                appStatus = Status.COMPLETED
+                clearSelection()
+                showDownloadDialog = false
+                Toast.makeText(getApplication(), "Downloaded ${successCount} selected songs", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                appStatus = Status.SCRAPED
+                Toast.makeText(getApplication(), "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     fun downloadSongAtIndex(index: Int) {
         if (index in 0 until spotifyList.length()) {
             val track = spotifyList.getJSONObject(index)

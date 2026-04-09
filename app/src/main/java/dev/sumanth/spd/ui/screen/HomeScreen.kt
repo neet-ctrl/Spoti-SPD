@@ -712,7 +712,7 @@ fun DownloadDialog(viewModel: HomeScreenViewModel) {
                         .fillMaxWidth()
                         .clickable {
                             viewModel.showDownloadDialog = false
-                            viewModel.downloadPlaylist()
+                            viewModel.downloadSelectedSongsIndividually()
                         },
                     shape = RoundedCornerShape(14.dp),
                     color = SpotifyGreen.copy(alpha = 0.12f)
