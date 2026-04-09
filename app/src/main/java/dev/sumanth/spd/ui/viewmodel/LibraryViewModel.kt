@@ -48,7 +48,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val scanError: StateFlow<String?> = _scanError.asStateFlow()
 
     val filteredSortedSongs: StateFlow<List<LocalSong>> =
-        combine(_songs, _sortOrder, _searchQuery, _favorites) { songs, order, query, favorites ->
+        combine(_songs, sortOrder, searchQuery, _favorites) { songs, order, query, favorites ->
             val withFavs = songs.map { it.copy(isFavorite = favorites.contains(it.filePath)) }
             val filtered = if (query.isBlank()) withFavs else withFavs.filter {
                 it.title.contains(query, ignoreCase = true) ||
@@ -58,6 +58,12 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             when (order) {
                 LibrarySortOrder.DATE_ADDED -> filtered.sortedByDescending { it.dateModified }
                 LibrarySortOrder.TITLE_ASC -> filtered.sortedBy { it.title.lowercase() }
+                LibrarySortOrder.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
+                LibrarySortOrder.ARTIST_ASC -> filtered.sortedBy { it.artist.lowercase() }
+                LibrarySortOrder.DURATION_DESC -> filtered.sortedByDescending { it.duration }
+                LibrarySortOrder.FAVORITES_FIRST -> filtered.sortedByDescending { it.isFavorite }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
                 LibrarySortOrder.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
                 LibrarySortOrder.ARTIST_ASC -> filtered.sortedBy { it.artist.lowercase() }
                 LibrarySortOrder.DURATION_DESC -> filtered.sortedByDescending { it.duration }
@@ -113,6 +119,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         if (!_scanWholeStorage.value) {
             refresh()
         }
+    }
+
+    fun setSortOrder(order: LibrarySortOrder) {
+        _sortOrder.value = order
     }
 
     fun setSearchQuery(q: String) {

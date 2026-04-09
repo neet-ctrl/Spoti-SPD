@@ -1,11 +1,27 @@
 package dev.sumanth.spd.ui.screen
 
-import android.content.Intent
-import android.os.Environment
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -139,7 +155,6 @@ fun LibraryScreen(
     val sortOrder by libraryViewModel.sortOrder.collectAsState()
     val searchQuery by libraryViewModel.searchQuery.collectAsState()
     val scanWholeStorage by libraryViewModel.scanWholeStorage.collectAsState()
-    val scanPath by libraryViewModel.scanPath.collectAsState()
     val scanPath by libraryViewModel.scanPath.collectAsState()
     val totalDuration by libraryViewModel.totalDuration.collectAsState()
     val totalSize by libraryViewModel.totalSize.collectAsState()
@@ -319,6 +334,7 @@ fun LibraryScreen(
     }
 }
 
+@Composable
 @Composable
 private fun LibraryHeader(
     songCount: Int,
@@ -941,6 +957,7 @@ private fun LibraryEmptyState(onScan: () -> Unit) {
     }
 }
 
+@Composable
 @Composable
 private fun SortBottomSheet(
     currentOrder: LibrarySortOrder,
