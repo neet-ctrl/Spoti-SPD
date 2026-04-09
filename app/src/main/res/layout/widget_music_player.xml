@@ -329,4 +329,36 @@
         android:scrollbars="none"
         android:background="@android:color/transparent" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="4dp">
+
+        <TextView
+            android:id="@+id/widget_debug_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textColor="#444466"
+            android:textSize="8sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_copy_log"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Copy Log"
+            android:textColor="#666688"
+            android:textSize="8sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:background="@drawable/widget_pill_bg" />
+    </LinearLayout>
+
 </LinearLayout>

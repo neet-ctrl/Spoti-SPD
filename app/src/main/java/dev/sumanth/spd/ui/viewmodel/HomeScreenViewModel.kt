@@ -130,6 +130,29 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     init {
         loadHistory()
         registerNotificationReceiver()
+        checkAndExecutePendingAction()
+    }
+
+    fun checkAndExecutePendingAction() {
+        val action = MusicPlayerService.consumePendingAction(getApplication())
+        if (action != null && action != MusicPlayerService.ACTION_PLAY_SONG_INDEX) {
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(300)
+                when (action) {
+                    MusicPlayerService.ACTION_PLAY_PAUSE -> togglePlayPause()
+                    MusicPlayerService.ACTION_NEXT -> nextSong()
+                    MusicPlayerService.ACTION_PREV -> previousSong()
+                    MusicPlayerService.ACTION_SHUFFLE -> toggleShuffle()
+                    MusicPlayerService.ACTION_REPEAT -> toggleRepeatMode()
+                    MusicPlayerService.ACTION_TOGGLE_FAVORITE -> toggleFavorite()
+                    MusicPlayerService.ACTION_SEEK_BACKWARD -> seekBy(-10f)
+                    MusicPlayerService.ACTION_SEEK_FORWARD -> seekBy(10f)
+                    MusicPlayerService.ACTION_SPEED_CHANGE -> cyclePlaybackSpeed()
+                    MusicPlayerService.ACTION_VOLUME_UP -> adjustVolume(0.1f)
+                    MusicPlayerService.ACTION_VOLUME_DOWN -> adjustVolume(-0.1f)
+                }
+            }
+        }
     }
 
     private fun registerNotificationReceiver() {

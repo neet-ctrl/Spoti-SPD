@@ -62,10 +62,20 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="dev.sumanth.spd.ACTION_REFRESH_LIBRARY" />
+                <action android:name="dev.sumanth.spd.ACTION_OPEN_LIBRARY" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/music_player_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".service.WidgetCopyLogReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.sumanth.spd.ACTION_COPY_WIDGET_LOG" />
+            </intent-filter>
         </receiver>
 
     </application>
