@@ -61,6 +61,7 @@ import dev.sumanth.spd.ui.theme.SpotifyGreen
 import dev.sumanth.spd.ui.theme.SpotifyGreenLight
 import dev.sumanth.spd.utils.SharedPref
 import dev.sumanth.spd.utils.WidgetLogger
+import dev.sumanth.spd.service.WidgetSongListFactory
 
 @Composable
 fun PreferencesScreen() {
@@ -196,7 +197,10 @@ fun PreferencesScreen() {
                     val widgetLogger = remember { WidgetLogger(context) }
                     val logs = remember { widgetLogger.getLogs() }
 
-                    val lastWidgetError = remember { WidgetSongListFactory.getLastError(context).takeIf { it.isNotBlank() } ?: "No recent widget service error" }
+                    val lastWidgetError = remember {
+                        val error = WidgetSongListFactory.getLastError(context)
+                        if (error.isNotBlank()) error else "No recent widget service error"
+                    }
 
                     SettingsItem(
                         icon = Icons.Filled.Code,
