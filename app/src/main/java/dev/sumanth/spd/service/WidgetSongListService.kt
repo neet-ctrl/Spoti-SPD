@@ -184,7 +184,7 @@ class WidgetSongListFactory(
                 setImageViewResource(R.id.song_item_icon, R.drawable.ic_music_note_widget)
                 setInt(R.id.song_item_root, "setBackgroundResource", R.drawable.widget_song_item_bg)
                 setTextColor(R.id.song_item_title, 0xFFFFFFFF.toInt())
-                setTextColor(R.id.song_item_artist, 0xFF9999BB.toInt())
+                setTextColor(R.id.song_item_artist, 0xFF1DB954.toInt())
             }
 
             val fillIntent = Intent().putExtra(MusicPlayerService.EXTRA_SONG_INDEX, song.index)
@@ -199,7 +199,7 @@ class WidgetSongListFactory(
             setTextViewText(R.id.song_item_duration, "")
             setImageViewResource(R.id.song_item_icon, R.drawable.ic_music_note_widget)
             setInt(R.id.song_item_root, "setBackgroundResource", R.drawable.widget_song_item_bg)
-            setTextColor(R.id.song_item_title, 0xFF9999BB.toInt())
+            setTextColor(R.id.song_item_title, 0xFF666688.toInt())
             setTextColor(R.id.song_item_artist, 0xFF666688.toInt())
         }
     }

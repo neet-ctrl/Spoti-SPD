@@ -2,23 +2,23 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/song_item_root"
     android:layout_width="match_parent"
-    android:layout_height="38dp"
+    android:layout_height="32dp"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingStart="8dp"
-    android:paddingEnd="8dp"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp"
-    android:layout_marginBottom="3dp"
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp"
+    android:layout_marginBottom="2dp"
     android:background="@drawable/widget_song_item_bg">
 
     <ImageView
         android:id="@+id/song_item_icon"
-        android:layout_width="16dp"
-        android:layout_height="16dp"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
         android:src="@drawable/ic_music_note_widget"
         android:contentDescription="Song"
-        android:layout_marginEnd="8dp" />
+        android:layout_marginEnd="6dp" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -42,7 +42,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Artist"
-            android:textColor="#9999BB"
+            android:textColor="#1DB954"
             android:textSize="9sp"
             android:maxLines="1"
             android:ellipsize="end" />
@@ -53,7 +53,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text=""
-        android:textColor="#9999BB"
-        android:textSize="9sp"
-        android:layout_marginStart="6dp" />
+        android:textColor="#666688"
+        android:textSize="8sp"
+        android:layout_marginStart="4dp" />
 </LinearLayout>
