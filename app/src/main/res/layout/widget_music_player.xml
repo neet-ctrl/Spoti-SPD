@@ -18,7 +18,6 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:src="@mipmap/ic_launcher"
-            android:contentDescription="Player icon"
             android:background="@drawable/widget_ctrl_btn_bg"
             android:padding="4dp" />
 
@@ -39,9 +38,7 @@
             android:layout_height="28dp"
             android:padding="4dp"
             android:src="@android:drawable/ic_menu_rotate"
-            android:tint="#FFFFFF"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Scan mode toggle" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
 
         <ImageView
             android:id="@+id/widget_refresh"
@@ -49,9 +46,7 @@
             android:layout_height="28dp"
             android:padding="4dp"
             android:src="@android:drawable/ic_popup_sync"
-            android:tint="#FFFFFF"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Refresh" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
     </LinearLayout>
 
     <LinearLayout
@@ -70,9 +65,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:src="@drawable/ic_music_note_widget"
-                android:tint="#1DB954"
-                android:padding="6dp"
-                android:contentDescription="Current song icon" />
+                android:padding="6dp" />
         </FrameLayout>
 
         <LinearLayout
@@ -111,9 +104,7 @@
             android:layout_height="24dp"
             android:padding="4dp"
             android:src="@android:drawable/ic_menu_more"
-            android:tint="#1DB954"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Change song" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
     </LinearLayout>
 
     <ProgressBar
@@ -140,9 +131,7 @@
             android:layout_height="32dp"
             android:padding="6dp"
             android:src="@android:drawable/ic_menu_rotate"
-            android:tint="#FFFFFF"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Shuffle" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
 
         <ImageView
             android:id="@+id/widget_prev"
@@ -150,9 +139,7 @@
             android:layout_height="32dp"
             android:padding="6dp"
             android:src="@android:drawable/ic_media_previous"
-            android:tint="#FFFFFF"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Previous" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
 
         <ImageView
             android:id="@+id/widget_play_pause"
@@ -160,9 +147,7 @@
             android:layout_height="44dp"
             android:padding="8dp"
             android:src="@android:drawable/ic_media_play"
-            android:tint="#1DB954"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Play/Pause" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
 
         <ImageView
             android:id="@+id/widget_next"
@@ -170,9 +155,7 @@
             android:layout_height="32dp"
             android:padding="6dp"
             android:src="@android:drawable/ic_media_next"
-            android:tint="#FFFFFF"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Next" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
 
         <ImageView
             android:id="@+id/widget_repeat"
@@ -180,9 +163,7 @@
             android:layout_height="32dp"
             android:padding="6dp"
             android:src="@android:drawable/ic_menu_rotate"
-            android:tint="#FFFFFF"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Repeat" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
     </LinearLayout>
 
     <LinearLayout
@@ -198,9 +179,7 @@
             android:layout_height="24dp"
             android:padding="4dp"
             android:src="@android:drawable/btn_star_big_off"
-            android:tint="#FFFFFF"
-            android:background="@drawable/widget_ctrl_btn_bg"
-            android:contentDescription="Favorite" />
+            android:background="@drawable/widget_ctrl_btn_bg" />
 
         <TextView
             android:id="@+id/widget_status"
