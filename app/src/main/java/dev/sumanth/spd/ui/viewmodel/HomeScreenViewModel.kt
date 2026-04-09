@@ -17,6 +17,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sumanth.spd.model.DownloadHistoryItem
 import dev.sumanth.spd.model.DownloadStatus
+import dev.sumanth.spd.model.LocalPlaybackItem
 import dev.sumanth.spd.model.Track
 import dev.sumanth.spd.service.MusicPlayerService
 import dev.sumanth.spd.utils.DownloadHistoryManager
@@ -75,6 +76,17 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     var playerOffsetX by mutableFloatStateOf(0f)
     var playerOffsetY by mutableFloatStateOf(0f)
     var isFavorite by mutableStateOf(false)
+
+    var isLocalPlayback by mutableStateOf(false)
+        private set
+    private val localPlaybackList = mutableListOf<LocalPlaybackItem>()
+    var currentLocalIndex by mutableStateOf(-1)
+        private set
+
+    val currentLocalFilePath: String?
+        get() = if (isLocalPlayback && currentLocalIndex in localPlaybackList.indices)
+            localPlaybackList[currentLocalIndex].filePath
+        else null
 
     private var mediaPlayer: android.media.MediaPlayer? = null
     private var playbackJob: Job? = null
@@ -487,13 +499,73 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun playLocalPlaylist(songs: List<LocalPlaybackItem>, startIndex: Int) {
+        if (songs.isEmpty() || startIndex !in songs.indices) return
+        localPlaybackList.clear()
+        localPlaybackList.addAll(songs)
+        isLocalPlayback = true
+        currentPlayingIndex = -1
+        playLocalAtIndex(startIndex)
+    }
+
+    private fun playLocalAtIndex(index: Int) {
+        if (index !in localPlaybackList.indices) return
+        currentLocalIndex = index
+        showPlayer = true
+        isPlaying = false
+        isPlayerLoading = true
+        currentTime = 0f
+        duration = 0f
+
+        val item = localPlaybackList[index]
+        playbackJob?.cancel()
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Main) {
+                    mediaPlayer?.release()
+                    mediaPlayer = android.media.MediaPlayer().apply {
+                        setDataSource(item.filePath)
+                        setVolume(volume, volume)
+                        setOnPreparedListener { mp ->
+                            this@HomeScreenViewModel.duration = mp.duration / 1000f
+                            this@HomeScreenViewModel.currentTime = 0f
+                            this@HomeScreenViewModel.isPlayerLoading = false
+                            this@HomeScreenViewModel.isPlaying = true
+                            mp.start()
+                            this@HomeScreenViewModel.startPlaybackProgressUpdater()
+                            this@HomeScreenViewModel.updateMusicNotification()
+                        }
+                        setOnCompletionListener {
+                            when (this@HomeScreenViewModel.repeatMode) {
+                                RepeatMode.ONE -> { it.seekTo(0); it.start() }
+                                RepeatMode.ALL -> this@HomeScreenViewModel.nextSong()
+                                else -> {
+                                    this@HomeScreenViewModel.isPlaying = false
+                                    this@HomeScreenViewModel.updateMusicNotification()
+                                }
+                            }
+                        }
+                        prepareAsync()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                isPlayerLoading = false
+                isPlaying = false
+                Toast.makeText(getApplication(), "Player error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     fun playSongAtIndex(index: Int) {
         if (index !in 0 until spotifyList.length()) return
-        if (currentPlayingIndex == index && mediaPlayer != null) {
+        if (!isLocalPlayback && currentPlayingIndex == index && mediaPlayer != null) {
             togglePlayPause()
             return
         }
 
+        isLocalPlayback = false
+        currentLocalIndex = -1
         currentPlayingIndex = index
         showPlayer = true
         isPlaying = false
@@ -579,22 +651,49 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun nextSong() {
-        val nextIndex = when {
-            isShuffleMode -> (0 until spotifyList.length()).random()
-            currentPlayingIndex < spotifyList.length() - 1 -> currentPlayingIndex + 1
-            repeatMode == RepeatMode.ALL -> 0
-            else -> return
+        if (isLocalPlayback) {
+            val nextIdx = when {
+                isShuffleMode -> localPlaybackList.indices.random()
+                currentLocalIndex < localPlaybackList.size - 1 -> currentLocalIndex + 1
+                repeatMode == RepeatMode.ALL -> 0
+                else -> return
+            }
+            isPlayerLoading = true
+            isPlaying = false
+            currentTime = 0f
+            duration = 0f
+            playLocalAtIndex(nextIdx)
+        } else {
+            val nextIndex = when {
+                isShuffleMode -> (0 until spotifyList.length()).random()
+                currentPlayingIndex < spotifyList.length() - 1 -> currentPlayingIndex + 1
+                repeatMode == RepeatMode.ALL -> 0
+                else -> return
+            }
+            playSongAtIndex(nextIndex)
         }
-        playSongAtIndex(nextIndex)
     }
 
     fun previousSong() {
-        val previousIndex = when {
-            currentPlayingIndex > 0 -> currentPlayingIndex - 1
-            repeatMode == RepeatMode.ALL -> spotifyList.length() - 1
-            else -> return
+        if (isLocalPlayback) {
+            val prevIdx = when {
+                currentLocalIndex > 0 -> currentLocalIndex - 1
+                repeatMode == RepeatMode.ALL -> localPlaybackList.size - 1
+                else -> return
+            }
+            isPlayerLoading = true
+            isPlaying = false
+            currentTime = 0f
+            duration = 0f
+            playLocalAtIndex(prevIdx)
+        } else {
+            val previousIndex = when {
+                currentPlayingIndex > 0 -> currentPlayingIndex - 1
+                repeatMode == RepeatMode.ALL -> spotifyList.length() - 1
+                else -> return
+            }
+            playSongAtIndex(previousIndex)
         }
-        playSongAtIndex(previousIndex)
     }
 
     fun toggleShuffle() {
@@ -605,17 +704,22 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         showPlayer = false
         isPlaying = false
         currentPlayingIndex = -1
+        currentLocalIndex = -1
+        isLocalPlayback = false
+        localPlaybackList.clear()
         playbackJob?.cancel()
         mediaPlayer?.pause()
         stopMusicService()
     }
 
     fun getCurrentSong(): Track? {
-        if (currentPlayingIndex in 0 until spotifyList.length()) {
+        return if (isLocalPlayback && currentLocalIndex in localPlaybackList.indices) {
+            val item = localPlaybackList[currentLocalIndex]
+            Track(item.title, item.artist)
+        } else if (!isLocalPlayback && currentPlayingIndex in 0 until spotifyList.length()) {
             val track = spotifyList.getJSONObject(currentPlayingIndex)
-            return Track(track.getString("title"), track.getString("artist"))
-        }
-        return null
+            Track(track.getString("title"), track.getString("artist"))
+        } else null
     }
 
     fun seekTo(positionSeconds: Float) {

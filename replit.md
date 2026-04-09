@@ -16,8 +16,9 @@ This is an Android project built with Kotlin + Jetpack Compose. Actual APK build
 ## Key Components
 
 ### Screens
-- `HomeScreen.kt` — Main download screen; Spotify-inspired gradient hero, song list with swipe gestures, floating bottom-sheet music player
+- `HomeScreen.kt` — Main download screen; Spotify-inspired gradient hero, song list with swipe gestures
 - `HistoryScreen.kt` — Download history; card-based layout, tap-to-open folder in file manager, expandable songs list
+- `LibraryScreen.kt` — Local music library; auto-scans download folder, animated stats header, search/sort, swipe-to-delete, favorites, connects to existing media player
 - `PreferencesScreen.kt` — Settings; folder picker, auto-update toggle, about info
 
 ### Components
@@ -25,7 +26,8 @@ This is an Android project built with Kotlin + Jetpack Compose. Actual APK build
 - `PermissionDialog.kt` — Storage permission request dialog (modern style)
 - `UpdateDialog.kt` — App update dialog (modern style)
 - `TopBar.kt` — App bar with SPD logo circle
-- `BottomBar.kt` — Bottom nav with animated SpotifyGreen indicator
+- `BottomBar.kt` — Bottom nav with animated SpotifyGreen indicator (4 tabs: Home, History, Library, Settings)
+- `FloatingMusicPlayer.kt` — Extracted shared floating player rendered at MainActivity level (persists across all tabs)
 
 ### Services
 - `MusicPlayerService.kt` — Foreground service for music player notification (MediaStyle, prev/play-pause/next/close actions)

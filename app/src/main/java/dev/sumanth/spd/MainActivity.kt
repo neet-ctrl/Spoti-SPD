@@ -37,9 +37,11 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,13 +72,16 @@ import androidx.core.content.ContextCompat
 import dev.sumanth.spd.model.NavigationItem
 import dev.sumanth.spd.ui.component.Background
 import dev.sumanth.spd.ui.component.BottomBar
+import dev.sumanth.spd.ui.component.FloatingMusicPlayer
 import dev.sumanth.spd.ui.component.PermissionDialog
 import dev.sumanth.spd.ui.component.TopBar
 import dev.sumanth.spd.ui.component.UpdateDialog
 import dev.sumanth.spd.ui.screen.HomeScreen
 import dev.sumanth.spd.ui.screen.HistoryScreen
+import dev.sumanth.spd.ui.screen.LibraryScreen
 import dev.sumanth.spd.ui.screen.PreferencesScreen
 import dev.sumanth.spd.ui.theme.SpotifyGreen
+import dev.sumanth.spd.ui.viewmodel.HomeScreenViewModel
 import dev.sumanth.spd.ui.viewmodel.UpdaterViewModel
 import dev.sumanth.spd.utils.NewPipeDownloader
 import dev.sumanth.spd.utils.SharedPref
@@ -87,10 +92,12 @@ class MainActivity : ComponentActivity() {
     private val navigationItems = listOf(
         NavigationItem("Home", Icons.Filled.Home, Icons.Outlined.Home),
         NavigationItem("History", Icons.Filled.History, Icons.Outlined.History),
+        NavigationItem("Library", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic),
         NavigationItem("Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
     )
 
     private val updateViewModel: UpdaterViewModel by viewModels()
+    private val homeViewModel: HomeScreenViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,7 +126,6 @@ class MainActivity : ComponentActivity() {
 
             var showCrashDialog by remember { mutableStateOf(hasCrash) }
 
-            // Request notification permission on Android 13+
             val notifPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission()
             ) { }
@@ -141,16 +147,25 @@ class MainActivity : ComponentActivity() {
                     topBar = { TopBar(title) },
                     bottomBar = { BottomBar(navigationItems, pagerState) }
                 ) { innerPadding ->
-                    HorizontalPager(
-                        state = pagerState,
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)
-                    ) { page ->
-                        when (page) {
-                            0 -> HomeScreen()
-                            1 -> HistoryScreen()
-                            2 -> PreferencesScreen()
+                    ) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            when (page) {
+                                0 -> HomeScreen(homeViewModel)
+                                1 -> HistoryScreen()
+                                2 -> LibraryScreen(homeViewModel)
+                                3 -> PreferencesScreen()
+                            }
+                        }
+
+                        if (homeViewModel.showPlayer) {
+                            FloatingMusicPlayer(homeViewModel)
                         }
                     }
 

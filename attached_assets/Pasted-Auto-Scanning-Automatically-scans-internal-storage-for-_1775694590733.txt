@@ -1,0 +1,60 @@
+Auto‑Scanning
+    Automatically scans internal storage for audio files (MP3, M4A, FLAC, WAV, OGG, AAC) from the configured download directory and any user‑selected folders.
+· Rich Metadata Extraction
+    Uses MediaMetadataRetriever to extract:
+  · Title (fallback to filename)
+  · Artist
+  · Album
+  · Duration (in milliseconds)
+  · Embedded cover art (cached locally)
+· Smart Database Caching
+    Room database stores all scanned songs for instant load times on subsequent app launches.
+  · Automatic removal of deleted files from the database.
+  · Efficient Flow‑based queries for reactive UI updates.
+· Library Statistics
+    Displays at the top of the screen:
+  · Total song count
+  · Total playback duration (formatted as HH:MM:SS)
+  · Total storage used (formatted as KB/MB/GB)
+· Animated Song List
+  · LazyColumn with smooth item insertion/deletion animations (animateItemPlacement).
+  · Shimmer loading effect while the initial scan runs.
+  · Swipe‑to‑play (right swipe) and swipe‑to‑delete (left swipe) actions with coloured backgrounds.
+  · Tap any song to start playback instantly.
+· Sorting & Filtering
+    Sort options via a dialog:
+  · Title (A‑Z / Z‑A)
+  · Artist (A‑Z / Z‑A)
+  · Duration (longest first)
+  · Recently added (newest first)
+· Favorites
+  · Heart icon to mark/unmark songs as favourites.
+  · Favourite state is persisted in the database.
+· Delete Songs
+  · Swipe left to trigger a delete confirmation dialog.
+  · Deleting a song removes both the file from storage and the database entry.
+· Manual Refresh
+    Floating Action Button (FAB) triggers a re‑scan of the storage directory.
+    Linear progress indicator shows scan progress (e.g., “45/120 files”).
+· Seamless Media Player Integration
+  · Tapping any song starts playback via the existing MusicPlayerService.
+  · The floating player panel appears and updates with the current track information.
+  · All playback controls (play/pause, next, previous, seek, shuffle, repeat) work identically to downloaded songs.
+· Material 3 Design
+  · Clean, modern UI consistent with the rest of the app.
+  · Adaptive theming (light/dark mode).
+  · Stat chips for song count, total duration, and storage.
+
+---Custom Playlists
+    Allow users to create, rename, and delete playlists.
+    Add/remove songs from playlists, stored in Room with a many‑to‑many relationship.
+· Recently Played Queue
+    Keep a rolling list of the last 20–50 played songs for quick access from the Library or a dedicated “Recent” section. Synced Lyrics Display
+    Fetch lyrics from online sources (e.g., LRCLIB)
+Additional Folder Scanner
+    Let users manually add other folders (e.g., “Music/My Collection”) to be included in the library scan, not just the default download directory.
+· Periodic Background Scan
+    Use WorkManager to schedule a periodic scan (e.g., once a day) to automatically pick up newly downloaded files even when the app isn’t open.
+· Cover Art Caching & Gallery
+    Extract and cache album art from audio files or folder.jpg.
+    Display a gallery view or grid option for albums/artists.
