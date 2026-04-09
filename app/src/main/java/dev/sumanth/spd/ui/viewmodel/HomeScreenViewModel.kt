@@ -170,10 +170,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     MusicPlayerService.ACTION_SEEK_BACKWARD -> seekBy(-10f)
                     MusicPlayerService.ACTION_SEEK_FORWARD -> seekBy(10f)
                     MusicPlayerService.ACTION_SEEK_TO -> {
-                        val pos = MusicPlayerService.consumePendingAction(getApplication())?.let {
-                            // For seek, we need to get the position from somewhere else
-                            // Actually, let's handle this differently
-                        }
+                        // Seek pending action is not handled here; seek updates come through notification broadcasts.
                     }
                     MusicPlayerService.ACTION_SPEED_CHANGE -> cyclePlaybackSpeed()
                     MusicPlayerService.ACTION_VOLUME_UP -> adjustVolume(0.1f)
@@ -200,6 +197,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             addAction(MusicPlayerService.ACTION_VOLUME_UP)
             addAction(MusicPlayerService.ACTION_VOLUME_DOWN)
             addAction(MusicPlayerService.ACTION_EQUALIZER)
+            addAction(MusicPlayerService.ACTION_UPDATE_NOTIFICATION)
         }
         LocalBroadcastManager.getInstance(getApplication()).registerReceiver(notificationActionReceiver, filter)
     }
