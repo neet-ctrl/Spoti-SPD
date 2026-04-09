@@ -33,13 +33,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _scanWholeStorage = MutableStateFlow(false)
     val scanWholeStorage: StateFlow<Boolean> = _scanWholeStorage.asStateFlow()
 
-    val scanPath: StateFlow<String> = combine(_scanWholeStorage) { scanWhole ->
-        if (scanWhole.first()) {
-            Environment.getExternalStorageDirectory().absolutePath
-        } else {
-            sharedPref.getLibraryScanPath()
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), sharedPref.getLibraryScanPath())
+    val scanPath: StateFlow<String> = _scanWholeStorage
+        .map { scanWhole ->
+            if (scanWhole) {
+                Environment.getExternalStorageDirectory().absolutePath
+            } else {
+                sharedPref.getLibraryScanPath()
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), sharedPref.getLibraryScanPath())
 
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
     val scanProgress: StateFlow<Pair<Int, Int>> = _scanProgress.asStateFlow()
@@ -58,12 +59,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             when (order) {
                 LibrarySortOrder.DATE_ADDED -> filtered.sortedByDescending { it.dateModified }
                 LibrarySortOrder.TITLE_ASC -> filtered.sortedBy { it.title.lowercase() }
-                LibrarySortOrder.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
-                LibrarySortOrder.ARTIST_ASC -> filtered.sortedBy { it.artist.lowercase() }
-                LibrarySortOrder.DURATION_DESC -> filtered.sortedByDescending { it.duration }
-                LibrarySortOrder.FAVORITES_FIRST -> filtered.sortedByDescending { it.isFavorite }
-            }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
                 LibrarySortOrder.TITLE_DESC -> filtered.sortedByDescending { it.title.lowercase() }
                 LibrarySortOrder.ARTIST_ASC -> filtered.sortedBy { it.artist.lowercase() }
                 LibrarySortOrder.DURATION_DESC -> filtered.sortedByDescending { it.duration }
@@ -131,8 +126,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun toggleFavorite(song: LocalSong) {
         val current = _favorites.value.toMutableSet()
-        if (current.contains(song.filePath)) current.remove(song.filePath)
-        else current.add(song.filePath)
+        if (current.contains(song.filePath)) {
+            current.remove(song.filePath)
+        } else {
+            current.add(song.filePath)
+        }
         _favorites.value = current
         saveFavorites()
     }
