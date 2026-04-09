@@ -2,6 +2,7 @@ package dev.sumanth.spd.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -49,6 +50,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _scanError = MutableStateFlow<String?>(null)
     private val _scanWholeStorage = MutableStateFlow(false)
     private val _libraryScanPath = MutableStateFlow(sharedPref.getLibraryScanPath())
+    private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == SharedPref.KEY_SCAN_WHOLE_STORAGE) {
+            val enabled = sharedPref.getScanWholeStorage()
+            if (enabled != _scanWholeStorage.value) {
+                _scanWholeStorage.value = enabled
+                refresh()
+            }
+        }
+    }
     val scanWholeStorage: StateFlow<Boolean> = _scanWholeStorage.asStateFlow()
 
     val scanPath: StateFlow<String> = combine(_scanWholeStorage, _libraryScanPath) { scanWhole, path ->
@@ -107,7 +117,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     init {
         loadFavorites()
         _scanWholeStorage.value = sharedPref.getScanWholeStorage()
+        sharedPref.registerOnChangeListener(preferenceListener)
         refresh()
+    }
+
+    override fun onCleared() {
+        sharedPref.unregisterOnChangeListener(preferenceListener)
+        super.onCleared()
     }
 
     fun refresh() {

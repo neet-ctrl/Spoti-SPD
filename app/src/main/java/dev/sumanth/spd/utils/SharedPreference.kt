@@ -1,6 +1,7 @@
 package dev.sumanth.spd.utils
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Environment
 import androidx.core.content.edit
 import java.io.File
@@ -42,6 +43,14 @@ class SharedPref(context: Context) {
         }
     }
 
+    fun registerOnChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        sharedPref.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterOnChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        sharedPref.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
     fun getAutoUpdateCheck(): Boolean {
         return sharedPref.getBoolean(KEY_AUTO_UPDATE_CHECK, true)
     }
@@ -61,7 +70,7 @@ class SharedPref(context: Context) {
         private const val PREFS_NAME = "spd_settings"
         private const val KEY_DOWNLOAD_PATH = "download_path"
         private const val KEY_LIBRARY_SCAN_PATH = "library_scan_path"
-        private const val KEY_SCAN_WHOLE_STORAGE = "scan_whole_storage"
+        const val KEY_SCAN_WHOLE_STORAGE = "scan_whole_storage"
         private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
         private const val DEFAULT_FOLDER_NAME = "spotify-playlist-downloader"
     }

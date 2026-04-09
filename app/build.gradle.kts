@@ -78,4 +78,5 @@ dependencies {
     implementation("androidx.media3:media3-session:1.1.1")
     implementation("androidx.media:media:1.7.0")
     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.8.1")
 }

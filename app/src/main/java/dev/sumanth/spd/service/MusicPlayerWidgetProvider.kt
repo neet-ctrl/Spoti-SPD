@@ -7,10 +7,15 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
 import dev.sumanth.spd.SongPickerDialogActivity
 import dev.sumanth.spd.service.MusicPlayerService
+import dev.sumanth.spd.service.LibraryRefreshWorker
+import dev.sumanth.spd.utils.SharedPref
 
 class MusicPlayerWidgetProvider : AppWidgetProvider() {
 
@@ -58,7 +63,7 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             val isShuffle = prefs.getBoolean(KEY_IS_SHUFFLE, false)
             val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
             val isFavorite = prefs.getBoolean(KEY_IS_FAVORITE, false)
-            val scanMode = prefs.getBoolean(KEY_SCAN_MODE, false)  // false = selected locations, true = whole storage
+            val scanMode = SharedPref(context).getScanWholeStorage()
 
             val progress = if (duration > 0f) {
                 ((currentTime.coerceIn(0f, duration) / duration) * 100).toInt()
@@ -190,25 +195,23 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
         when (intent.action) {
             ACTION_REFRESH_LIBRARY -> {
-                // Set loading state and start the refresh service with current scan mode
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val scanMode = prefs.getBoolean(KEY_SCAN_MODE, false)
-                
-                // Set loading state in player widget prefs
+                // Set loading state and run a background worker to refresh library safely
                 val playerPrefs = context.getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
                 playerPrefs.edit().putBoolean("is_loading", true).apply()
-                
-                val serviceIntent = Intent(context, LibraryRefreshService::class.java).apply {
-                    putExtra(LibraryRefreshService.EXTRA_SCAN_MODE, scanMode)
-                }
-                context.startService(serviceIntent)
+
+                val work = OneTimeWorkRequestBuilder<LibraryRefreshWorker>().build()
+                WorkManager.getInstance(context)
+                    .enqueueUniqueWork("widget_library_refresh", ExistingWorkPolicy.REPLACE, work)
                 updateAllWidgets(context)
             }
             ACTION_TOGGLE_SCAN_MODE -> {
-                // Toggle scan mode preference
+                // Toggle scan mode preference and sync with library settings
                 val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val currentScanMode = prefs.getBoolean(KEY_SCAN_MODE, false)
-                prefs.edit().putBoolean(KEY_SCAN_MODE, !currentScanMode).apply()
+                val sharedPref = SharedPref(context)
+                val currentScanMode = sharedPref.getScanWholeStorage()
+                val newScanMode = !currentScanMode
+                sharedPref.storeScanWholeStorage(newScanMode)
+                prefs.edit().putBoolean(KEY_SCAN_MODE, newScanMode).apply()
                 updateAllWidgets(context)
             }
             ACTION_OPEN_LIBRARY -> {
