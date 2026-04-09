@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
 import dev.sumanth.spd.SongPickerDialogActivity
 import dev.sumanth.spd.service.MusicPlayerService
