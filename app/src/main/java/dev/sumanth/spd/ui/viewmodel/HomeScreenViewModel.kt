@@ -855,8 +855,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                                 else -> "Playback error: ${e.message}"
                             }
                             Toast.makeText(getApplication(), "Cannot play ${item.title}: $errorMsg", Toast.LENGTH_LONG).show()
-                            isPlayerLoading = false
-                            isPlaying = false
+                            this@HomeScreenViewModel.isPlayerLoading = false
+                            this@HomeScreenViewModel.isPlaying = false
                         }
                     }
                 }

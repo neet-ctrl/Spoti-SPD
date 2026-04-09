@@ -6,7 +6,7 @@ import android.os.IBinder
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
-import dev.sumanth.spd.SpdApplication
+import dev.sumanth.spd.App
 import dev.sumanth.spd.ui.viewmodel.LibraryViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,8 +22,7 @@ class LibraryRefreshService : Service() {
             override val viewModelStore: ViewModelStore = ViewModelStore()
         }
 
-        val factory = (application as SpdApplication).viewModelFactory
-        val libraryViewModel = ViewModelProvider(viewModelStoreOwner, factory)[LibraryViewModel::class.java]
+        val libraryViewModel = ViewModelProvider(viewModelStoreOwner)[LibraryViewModel::class.java]
 
         // Trigger refresh in background
         CoroutineScope(Dispatchers.IO).launch {
