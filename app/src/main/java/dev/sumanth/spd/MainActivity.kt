@@ -82,12 +82,18 @@ import dev.sumanth.spd.ui.screen.LibraryScreen
 import dev.sumanth.spd.ui.screen.PreferencesScreen
 import dev.sumanth.spd.ui.theme.SpotifyGreen
 import dev.sumanth.spd.ui.viewmodel.HomeScreenViewModel
+import dev.sumanth.spd.ui.viewmodel.LibraryViewModel
 import dev.sumanth.spd.ui.viewmodel.UpdaterViewModel
 import dev.sumanth.spd.utils.NewPipeDownloader
 import dev.sumanth.spd.utils.SharedPref
 import org.schabi.newpipe.extractor.NewPipe
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        const val ACTION_OPEN_LIBRARY = "dev.sumanth.spd.ACTION_OPEN_LIBRARY"
+        const val EXTRA_REFRESH_LIBRARY = "extra_refresh_library"
+    }
 
     private val navigationItems = listOf(
         NavigationItem("Home", Icons.Filled.Home, Icons.Outlined.Home),
@@ -98,9 +104,12 @@ class MainActivity : ComponentActivity() {
 
     private val updateViewModel: UpdaterViewModel by viewModels()
     private val homeViewModel: HomeScreenViewModel by viewModels()
+    private val libraryViewModel: LibraryViewModel by viewModels()
+    private val widgetIntentState = mutableStateOf<Intent?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleWidgetIntent(intent)
         enableEdgeToEdge()
 
         val sharedPref = SharedPref(this)
@@ -142,6 +151,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(widgetIntentState.value) {
+                widgetIntentState.value?.let { widgetIntent ->
+                    if (widgetIntent.action == ACTION_OPEN_LIBRARY) {
+                        pagerState.scrollToPage(2)
+                        if (widgetIntent.getBooleanExtra(EXTRA_REFRESH_LIBRARY, false)) {
+                            libraryViewModel.refresh()
+                        }
+                    }
+                    widgetIntentState.value = null
+                }
+            }
+
             Background {
                 Scaffold(
                     topBar = { TopBar(title) },
@@ -159,7 +180,7 @@ class MainActivity : ComponentActivity() {
                             when (page) {
                                 0 -> HomeScreen(homeViewModel)
                                 1 -> HistoryScreen()
-                                2 -> LibraryScreen(homeViewModel)
+                                2 -> LibraryScreen(homeViewModel, libraryViewModel)
                                 3 -> PreferencesScreen()
                             }
                         }
@@ -181,6 +202,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleWidgetIntent(intent)
+    }
+
+    private fun handleWidgetIntent(intent: Intent?) {
+        if (intent?.action == ACTION_OPEN_LIBRARY) {
+            widgetIntentState.value = intent
         }
     }
 }

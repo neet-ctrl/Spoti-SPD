@@ -7,8 +7,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import dev.sumanth.spd.MainActivity
 import dev.sumanth.spd.R
@@ -111,26 +113,36 @@ class MusicPlayerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val playPauseIcon = if (isPlaying) 0 else 0
+        val notificationView = RemoteViews(packageName, R.layout.notification_music_player).apply {
+            setTextViewText(R.id.notification_title, title)
+            setTextViewText(R.id.notification_artist, artist)
+            setTextViewText(R.id.notification_header, "Library Player")
+            setTextViewText(R.id.notification_subheader, "SPD Media")
+            setImageViewResource(
+                R.id.action_play_pause,
+                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+            )
+            setOnClickPendingIntent(R.id.action_prev, prevIntent)
+            setOnClickPendingIntent(R.id.action_play_pause, playPauseIntent)
+            setOnClickPendingIntent(R.id.action_next, nextIntent)
+            setOnClickPendingIntent(R.id.notification_close, closeIntent)
+            setOnClickPendingIntent(R.id.notification_root, openAppIntent)
+            setInt(R.id.notification_root, "setBackgroundColor", Color.parseColor("#121212"))
+        }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(artist)
-            .setSubText("SPD Player")
+            .setSubText("Library Player")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(openAppIntent)
+            .setCustomContentView(notificationView)
+            .setCustomBigContentView(notificationView)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(isPlaying)
             .setShowWhen(false)
             .setSilent(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(0, "Previous", prevIntent)
-            .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPauseIntent)
-            .addAction(0, "Next", nextIntent)
-            .addAction(0, "Close", closeIntent)
-            .setStyle(
-                androidx.media.app.NotificationCompat.MediaStyle()
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
             .build()
     }
 

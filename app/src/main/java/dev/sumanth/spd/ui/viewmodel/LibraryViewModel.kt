@@ -6,6 +6,7 @@ import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sumanth.spd.model.LocalSong
+import dev.sumanth.spd.service.LibraryWidgetProvider
 import dev.sumanth.spd.utils.LibraryScanner
 import dev.sumanth.spd.utils.SharedPref
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     private val scanner = LibraryScanner(application)
     private val sharedPref = SharedPref(application)
+
+    companion object {
+        private const val PREFS_NAME = "library_widget_prefs"
+        private const val KEY_SONG_COUNT = "song_count"
+        private const val KEY_TOTAL_DURATION = "total_duration"
+        private const val KEY_TOTAL_SIZE = "total_size"
+        private const val KEY_SCAN_PATH = "scan_path"
+        private const val KEY_IS_SCANNING = "is_scanning"
+    }
 
     private val _songs = MutableStateFlow<List<LocalSong>>(emptyList())
     private val _isScanning = MutableStateFlow(false)
@@ -91,6 +101,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun refresh() {
         viewModelScope.launch {
             _isScanning.value = true
+            persistWidgetState(true)
             _scanProgress.value = Pair(0, 0)
             _scanError.value = null
             try {
@@ -99,10 +110,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     _scanProgress.value = Pair(processed, total)
                 }
                 _songs.value = songs
+                persistWidgetState(false)
             } catch (e: Exception) {
                 _scanError.value = e.message
+                persistWidgetState(false)
             } finally {
                 _isScanning.value = false
+                LibraryWidgetProvider.updateAllWidgets(getApplication())
             }
         }
     }
@@ -119,6 +133,17 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         if (!_scanWholeStorage.value) {
             refresh()
         }
+    }
+
+    private fun persistWidgetState(isScanning: Boolean) {
+        val prefs = getApplication<Application>().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt(KEY_SONG_COUNT, _songs.value.size)
+            .putLong(KEY_TOTAL_DURATION, _songs.value.sumOf { it.duration })
+            .putLong(KEY_TOTAL_SIZE, _songs.value.sumOf { it.size })
+            .putString(KEY_SCAN_PATH, scanPath.value)
+            .putBoolean(KEY_IS_SCANNING, isScanning)
+            .apply()
     }
 
     fun setSortOrder(order: LibrarySortOrder) {
