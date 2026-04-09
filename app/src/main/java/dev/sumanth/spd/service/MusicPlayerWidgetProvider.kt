@@ -84,6 +84,7 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_next, buildControlIntent(context, MusicPlayerService.ACTION_NEXT))
                 setOnClickPendingIntent(R.id.widget_repeat, buildControlIntent(context, MusicPlayerService.ACTION_REPEAT))
                 setOnClickPendingIntent(R.id.widget_favorite, buildControlIntent(context, MusicPlayerService.ACTION_TOGGLE_FAVORITE))
+                setOnClickPendingIntent(R.id.widget_change_song, buildOpenLibraryIntent(context, false))
                 setOnClickPendingIntent(R.id.widget_refresh, buildRefreshIntent(context))
                 setOnClickPendingIntent(R.id.widget_progress, buildOpenLibraryIntent(context, false))
                 setOnClickPendingIntent(R.id.widget_root, buildOpenLibraryIntent(context, false))
