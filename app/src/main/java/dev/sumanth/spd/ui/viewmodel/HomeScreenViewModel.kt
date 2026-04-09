@@ -788,14 +788,18 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 withContext(Dispatchers.Main) {
                     // Request audio focus before playback
                     val audioManager = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                    val focusResult = audioManager.requestAudioFocus(
-                        { focusChange ->
-                            if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-                                mediaPlayer?.pause()
-                            } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-                                mediaPlayer?.pause()
+                    val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+                        if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                            if (mediaPlayer?.isPlaying == true) {
+                                try {
+                                    mediaPlayer?.pause()
+                                } catch (ignored: IllegalStateException) {
+                                }
                             }
-                        },
+                        }
+                    }
+                    val focusResult = audioManager.requestAudioFocus(
+                        audioFocusListener,
                         AudioManager.STREAM_MUSIC,
                         AudioManager.AUDIOFOCUS_GAIN
                     )
@@ -987,13 +991,17 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     fun togglePlayPause() {
         mediaPlayer?.let { player ->
-            if (player.isPlaying) {
-                player.pause()
-                isPlaying = false
-            } else {
-                player.start()
-                isPlaying = true
-                startPlaybackProgressUpdater()
+            try {
+                if (player.isPlaying) {
+                    player.pause()
+                    isPlaying = false
+                } else {
+                    player.start()
+                    isPlaying = true
+                    startPlaybackProgressUpdater()
+                }
+            } catch (e: IllegalStateException) {
+                android.util.Log.e("MusicPlayer", "togglePlayPause failed, invalid player state", e)
             }
             updateMusicNotification()
         }
@@ -1058,7 +1066,12 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
         isLocalPlayback = false
         localPlaybackList.clear()
         playbackJob?.cancel()
-        mediaPlayer?.pause()
+        if (mediaPlayer?.isPlaying == true) {
+            try {
+                mediaPlayer?.pause()
+            } catch (ignored: IllegalStateException) {
+            }
+        }
         stopMusicService()
         persistPlayerWidgetState("No song selected", "")
         MusicPlayerWidgetProvider.updateAllWidgets(getApplication())
@@ -1076,7 +1089,13 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     fun seekTo(positionSeconds: Float) {
         currentTime = positionSeconds.coerceIn(0f, duration)
-        mediaPlayer?.seekTo((currentTime * 1000).toInt())
+        if (mediaPlayer != null && !isPlayerLoading && duration > 0f) {
+            try {
+                mediaPlayer?.seekTo((currentTime * 1000).toInt())
+            } catch (e: IllegalStateException) {
+                android.util.Log.e("MusicPlayer", "Seek failed, invalid player state", e)
+            }
+        }
         updateMusicNotification()
     }
 
@@ -1086,7 +1105,13 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setVolume(newVolume: Float) {
         _volume = newVolume.coerceIn(0f, 1f)
-        mediaPlayer?.setVolume(_volume, _volume)
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer?.setVolume(_volume, _volume)
+            } catch (e: IllegalStateException) {
+                android.util.Log.e("MusicPlayer", "Volume set failed, invalid player state", e)
+            }
+        }
     }
 
     fun toggleRepeatMode() {
