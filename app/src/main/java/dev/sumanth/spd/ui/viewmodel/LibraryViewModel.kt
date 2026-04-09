@@ -83,6 +83,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    init {
+        // Save filtered songs to widget whenever they change
+        viewModelScope.launch {
+            filteredSortedSongs.collect { songs ->
+                saveFilteredSongsForWidget(songs)
+            }
+        }
+    }
+
     val totalDuration: StateFlow<Long> = _songs
         .map { songs -> songs.sumOf { it.duration } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
@@ -152,8 +161,23 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         playerPrefs.edit().putInt("song_count", _songs.value.size).apply()
 
         if (!isScanning) {
-            saveSongsForWidget()
+            // Removed saveSongsForWidget() - now done automatically when filtered songs change
         }
+    }
+
+    private fun saveFilteredSongsForWidget(songs: List<LocalSong>) {
+        val arr = JSONArray()
+        songs.forEachIndexed { _, song ->
+            arr.put(JSONObject().apply {
+                put("title", song.title)
+                put("artist", song.artist)
+                put("filePath", song.filePath)
+                put("duration", song.duration)
+            })
+        }
+        WidgetSongListFactory.saveSongsToPrefs(getApplication(), arr.toString())
+        // Update widget to refresh the list
+        MusicPlayerWidgetProvider.updateAllWidgets(getApplication())
     }
 
     private fun saveSongsForWidget() {

@@ -191,7 +191,7 @@ class MusicPlayerService : Service() {
                             putExtra(EXTRA_SONG_INDEX, songIndex)
                         }
                     )
-                    launchApp()
+                    // Removed launchApp() - don't open app for widget playback
                 }
             }
             ACTION_CLOSE -> {
