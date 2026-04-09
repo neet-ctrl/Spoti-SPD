@@ -100,7 +100,7 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 // Set up pending intent template for song list item clicks
                 val songClickIntent = Intent(context, MusicPlayerService::class.java).apply {
                     action = MusicPlayerService.ACTION_PLAY_SONG_INDEX
-                    flags = Intent.FLAG_UPDATE_CURRENT
+                    flags = PendingIntent.FLAG_UPDATE_CURRENT
                 }
                 val songClickTemplate = PendingIntent.getService(
                     context,
