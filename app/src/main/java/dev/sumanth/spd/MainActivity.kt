@@ -15,33 +15,35 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.IconButton
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.History
@@ -145,6 +147,7 @@ class MainActivity : ComponentActivity() {
                 derivedStateOf { navigationItems[pagerState.currentPage].title }
             }
 
+            val songs by libraryViewModel.filteredSortedSongs.collectAsState(initial = emptyList())
             var showCrashDialog by remember { mutableStateOf(hasCrash) }
 
             val notifPermissionLauncher = rememberLauncherForActivityResult(
@@ -207,12 +210,12 @@ class MainActivity : ComponentActivity() {
 
                     if (showSongPickerState.value) {
                         SongPickerDialog(
-                            songs = libraryViewModel.songs,
+                            songs = songs.map { LocalPlaybackItem(it.filePath, it.title, it.artist) },
                             onSongSelected = { index ->
-                                val playlist = libraryViewModel.songs.map {
-                                    LocalPlaybackItem(it.filePath, it.title, it.artist)
-                                }
-                                homeViewModel.playLocalPlaylist(playlist, index)
+                                homeViewModel.playLocalPlaylist(
+                                    songs.map { LocalPlaybackItem(it.filePath, it.title, it.artist) },
+                                    index
+                                )
                                 showSongPickerState.value = false
                             },
                             onDismiss = { showSongPickerState.value = false }
