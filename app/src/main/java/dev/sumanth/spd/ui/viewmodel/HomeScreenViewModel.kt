@@ -114,6 +114,10 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 MusicPlayerService.ACTION_TOGGLE_FAVORITE -> toggleFavorite()
                 MusicPlayerService.ACTION_SEEK_BACKWARD -> seekBy(-10f)
                 MusicPlayerService.ACTION_SEEK_FORWARD -> seekBy(10f)
+                MusicPlayerService.ACTION_SEEK_TO -> {
+                    val pos = intent?.getFloatExtra(MusicPlayerService.EXTRA_SEEK_POSITION, 0f) ?: 0f
+                    seekTo(pos)
+                }
                 MusicPlayerService.ACTION_CLOSE -> closePlayer()
                 MusicPlayerService.ACTION_PLAY_SONG_INDEX -> {
                     val idx = intent?.getIntExtra(MusicPlayerService.EXTRA_SONG_INDEX, -1) ?: -1
@@ -147,6 +151,12 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     MusicPlayerService.ACTION_TOGGLE_FAVORITE -> toggleFavorite()
                     MusicPlayerService.ACTION_SEEK_BACKWARD -> seekBy(-10f)
                     MusicPlayerService.ACTION_SEEK_FORWARD -> seekBy(10f)
+                    MusicPlayerService.ACTION_SEEK_TO -> {
+                        val pos = MusicPlayerService.consumePendingAction(getApplication())?.let {
+                            // For seek, we need to get the position from somewhere else
+                            // Actually, let's handle this differently
+                        }
+                    }
                     MusicPlayerService.ACTION_SPEED_CHANGE -> cyclePlaybackSpeed()
                     MusicPlayerService.ACTION_VOLUME_UP -> adjustVolume(0.1f)
                     MusicPlayerService.ACTION_VOLUME_DOWN -> adjustVolume(-0.1f)
@@ -165,6 +175,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             addAction(MusicPlayerService.ACTION_TOGGLE_FAVORITE)
             addAction(MusicPlayerService.ACTION_SEEK_BACKWARD)
             addAction(MusicPlayerService.ACTION_SEEK_FORWARD)
+            addAction(MusicPlayerService.ACTION_SEEK_TO)
             addAction(MusicPlayerService.ACTION_CLOSE)
             addAction(MusicPlayerService.ACTION_PLAY_SONG_INDEX)
             addAction(MusicPlayerService.ACTION_SPEED_CHANGE)

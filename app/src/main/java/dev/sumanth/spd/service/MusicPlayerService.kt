@@ -37,6 +37,7 @@ class MusicPlayerService : Service() {
         const val ACTION_TOGGLE_FAVORITE = "dev.sumanth.spd.ACTION_TOGGLE_FAVORITE"
         const val ACTION_SEEK_BACKWARD = "dev.sumanth.spd.ACTION_SEEK_BACKWARD"
         const val ACTION_SEEK_FORWARD = "dev.sumanth.spd.ACTION_SEEK_FORWARD"
+        const val ACTION_SEEK_TO = "dev.sumanth.spd.ACTION_SEEK_TO"
         const val ACTION_PLAY_SONG_INDEX = "dev.sumanth.spd.ACTION_PLAY_SONG_INDEX"
         const val ACTION_SPEED_CHANGE = "dev.sumanth.spd.ACTION_SPEED_CHANGE"
         const val ACTION_VOLUME_UP = "dev.sumanth.spd.ACTION_VOLUME_UP"
@@ -57,6 +58,7 @@ class MusicPlayerService : Service() {
         const val EXTRA_VOLUME = "extra_volume"
         const val EXTRA_SONG_POSITION = "extra_song_position"
         const val EXTRA_SONG_TOTAL = "extra_song_total"
+        const val EXTRA_SEEK_POSITION = "extra_seek_position"
 
         private const val PENDING_PREFS = "player_pending_prefs"
         private const val KEY_PENDING_ACTION = "pending_action"
@@ -138,6 +140,15 @@ class MusicPlayerService : Service() {
                 override fun onSkipToPrevious() = dispatchAction(ACTION_PREV)
                 override fun onFastForward() = dispatchAction(ACTION_SEEK_FORWARD)
                 override fun onRewind() = dispatchAction(ACTION_SEEK_BACKWARD)
+                override fun onSeekTo(pos: Long) {
+                    savePendingAction(this@MusicPlayerService, ACTION_SEEK_TO)
+                    LocalBroadcastManager.getInstance(this@MusicPlayerService).sendBroadcast(
+                        Intent(ACTION_SEEK_TO).apply {
+                            setPackage(packageName)
+                            putExtra(EXTRA_SEEK_POSITION, pos / 1000f)
+                        }
+                    )
+                }
                 override fun onStop() = dispatchAction(ACTION_CLOSE)
             })
             isActive = true
@@ -320,54 +331,6 @@ class MusicPlayerService : Service() {
         }
         val queueLabel = if (songPos >= 0 && songTotal > 0) "${songPos + 1} / $songTotal" else ""
 
-        val customView = RemoteViews(packageName, R.layout.notification_music_player).apply {
-            setTextViewText(R.id.notification_title, if (isLoading) "Loading..." else title)
-            setTextViewText(R.id.notification_artist, artist.ifBlank { "Unknown Artist" })
-            setTextViewText(R.id.notification_subheader, "SPD Library")
-            setTextViewText(R.id.notification_queue_pos, queueLabel)
-            setTextViewText(R.id.notification_speed_label, speedLabel)
-            setTextViewText(R.id.notification_current_time,
-                "%d:%02d".format(currentTime.toInt() / 60, currentTime.toInt() % 60))
-            setTextViewText(R.id.notification_total_duration,
-                "%d:%02d".format(duration.toInt() / 60, duration.toInt() % 60))
-            setTextViewText(R.id.notification_footer,
-                if (isLoading) "Loading track..." else if (isPlaying) "▶ Now Playing" else "⏸ Paused")
-            setProgressBar(R.id.notification_progress, 100, progressPct, false)
-            setProgressBar(R.id.notification_volume_bar, 100, volumePct, false)
-
-            setImageViewResource(R.id.notification_icon, R.drawable.spd_icon)
-            setImageViewResource(R.id.action_play_pause,
-                if (isPlaying) R.drawable.ic_pause_widget else R.drawable.ic_play_widget)
-            setImageViewResource(R.id.action_prev, R.drawable.ic_skip_prev_widget)
-            setImageViewResource(R.id.action_next, R.drawable.ic_skip_next_widget)
-            setImageViewResource(R.id.action_seek_backward, R.drawable.ic_fast_rewind_widget)
-            setImageViewResource(R.id.action_seek_forward, R.drawable.ic_fast_forward_widget)
-            setImageViewResource(R.id.action_shuffle, R.drawable.ic_shuffle_widget)
-            setInt(R.id.action_shuffle, "setColorFilter",
-                if (isShuffle) 0xFF1DB954.toInt() else 0xFFAAAAAA.toInt())
-            setImageViewResource(R.id.action_repeat,
-                if (repeatMode == 1) R.drawable.ic_repeat_one_widget else R.drawable.ic_repeat_widget)
-            setInt(R.id.action_repeat, "setColorFilter",
-                if (repeatMode > 0) 0xFF1DB954.toInt() else 0xFFAAAAAA.toInt())
-            setImageViewResource(R.id.action_favorite,
-                if (isFavorite) R.drawable.ic_favorite_widget else R.drawable.ic_favorite_border_widget)
-
-            setOnClickPendingIntent(R.id.action_prev, prevIntent)
-            setOnClickPendingIntent(R.id.action_play_pause, playPauseIntent)
-            setOnClickPendingIntent(R.id.action_next, nextIntent)
-            setOnClickPendingIntent(R.id.action_shuffle, shuffleIntent)
-            setOnClickPendingIntent(R.id.action_repeat, repeatIntent)
-            setOnClickPendingIntent(R.id.action_favorite, favoriteIntent)
-            setOnClickPendingIntent(R.id.action_seek_backward, seekBackIntent)
-            setOnClickPendingIntent(R.id.action_seek_forward, seekFwdIntent)
-            setOnClickPendingIntent(R.id.action_speed, speedIntent)
-            setOnClickPendingIntent(R.id.action_volume_up, volUpIntent)
-            setOnClickPendingIntent(R.id.action_volume_down, volDownIntent)
-            setOnClickPendingIntent(R.id.action_equalizer, eqIntent)
-            setOnClickPendingIntent(R.id.notification_close, closeIntent)
-            setOnClickPendingIntent(R.id.notification_root, openAppIntent)
-        }
-
         val largeIcon = try {
             BitmapFactory.decodeResource(resources, R.drawable.spd_icon)
         } catch (_: Exception) { null }
@@ -381,8 +344,6 @@ class MusicPlayerService : Service() {
             .apply { if (largeIcon != null) setLargeIcon(largeIcon) }
             .setContentIntent(openAppIntent)
             .setDeleteIntent(closeIntent)
-            .setCustomContentView(customView)
-            .setCustomBigContentView(customView)
             .setOngoing(isPlaying)
             .setShowWhen(false)
             .setSilent(true)
