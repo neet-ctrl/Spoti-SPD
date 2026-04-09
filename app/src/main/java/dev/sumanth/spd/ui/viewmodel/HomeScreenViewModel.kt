@@ -146,6 +146,7 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     val artist = intent?.getStringExtra(MusicPlayerService.EXTRA_ARTIST) ?: ""
                     updateNotificationFromService(isPlaying, currentTime, duration, isLoading, title, artist)
                 }
+            }
         }
     }
 
