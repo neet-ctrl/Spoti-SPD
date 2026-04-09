@@ -1,0 +1,769 @@
+We'll add a new "Library" tab to the bottom bar that automatically scans and displays all locally downloaded music files with rich metadata, total counts, and seamless integration with the existing media player. Below is a comprehensive implementation guide covering architecture, code, animations, and advanced features.
+
+---
+
+🎯 Feature Overview
+
+· Auto‑scan internal storage for audio files (MP3, M4A, FLAC, etc.) from the configured download directory and any user‑selected folders.
+· Metadata extraction using MediaMetadataRetriever: title, artist, album, duration, cover art (embedded or from folder.jpg).
+· Smart caching with Room database for instant load times after first scan.
+· New "Library" tab in bottom navigation with:
+  · Total song count, total duration, and storage used.
+  · Beautiful Material 3 list with animated items, shimmer while loading, and smooth transitions.
+  · Sorting & filtering (by title, artist, album, recently added).
+  · Swipe‑to‑play / swipe‑to‑delete actions.
+· Seamless playback – tapping any song starts playback via the existing MusicPlayerService and shows the floating player.
+· Extra features: create custom playlists, mark favorites, and sync with the existing download history.
+
+---
+
+📁 1. Understanding the Existing Codebase
+
+Before adding the new feature, let's recall the key components of the SPD app:
+
+· HomeScreen – scrapes Spotify links, downloads songs, and displays them.
+· HomeScreenViewModel – manages download queue, playback state, and communicates with MusicPlayerService.
+· MusicPlayerService – background service that handles media playback, notifications, and callbacks.
+· FloatingPlayer – composable at the bottom of the screen showing current track and controls.
+· BottomBar – currently has two items: "Home" and "History" (and maybe "Settings").
+
+We will:
+
+· Extend BottomBar to include a new "Library" tab.
+· Create a new LibraryScreen composable and its corresponding LibraryViewModel.
+· Implement a scanner that runs in a coroutine and populates a Room database.
+· Re‑use the existing media player integration.
+
+---
+
+🗂️ 2. Database Setup (Room)
+
+We need a local database to store scanned songs so the list appears instantly on subsequent app launches.
+
+2.1. Entity: LocalSong
+
+```kotlin
+// model/LocalSong.kt
+@Entity(tableName = "local_songs")
+data class LocalSong(
+    @PrimaryKey(autoGenerate = false)
+    val filePath: String,          // absolute file path (unique)
+    val title: String,
+    val artist: String,
+    val album: String,
+    val duration: Long,            // in milliseconds
+    val size: Long,                // file size in bytes
+    val dateModified: Long,        // last modified timestamp
+    val coverArtPath: String? = null, // path to cached cover art (if extracted)
+    val isFavorite: Boolean = false
+)
+```
+
+2.2. DAO: LocalSongDao
+
+```kotlin
+// data/LocalSongDao.kt
+@Dao
+interface LocalSongDao {
+    @Query("SELECT * FROM local_songs ORDER BY title ASC")
+    fun getAllSongs(): Flow<List<LocalSong>>
+
+    @Query("SELECT * FROM local_songs WHERE filePath = :path")
+    suspend fun getSong(path: String): LocalSong?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(songs: List<LocalSong>)
+
+    @Update
+    suspend fun update(song: LocalSong)
+
+    @Delete
+    suspend fun delete(song: LocalSong)
+
+    @Query("DELETE FROM local_songs WHERE filePath NOT IN (:existingPaths)")
+    suspend fun deleteMissing(existingPaths: List<String>)
+
+    @Query("SELECT COUNT(*) FROM local_songs")
+    fun getSongCount(): Flow<Int>
+
+    @Query("SELECT SUM(duration) FROM local_songs")
+    fun getTotalDuration(): Flow<Long>
+
+    @Query("SELECT SUM(size) FROM local_songs")
+    fun getTotalSize(): Flow<Long>
+}
+```
+
+2.3. Database: AppDatabase
+
+```kotlin
+// data/AppDatabase.kt
+@Database(entities = [LocalSong::class], version = 1, exportSchema = false)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun localSongDao(): LocalSongDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getInstance(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "spd_database"
+                ).build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}
+```
+
+---
+
+🔍 3. Scanning Local Files
+
+We'll create a LibraryScanner utility that runs in a background coroutine and updates the database.
+
+3.1. Permission Handling
+
+The app already requests storage permissions for downloads. We'll reuse the existing Permission.kt to ensure READ_EXTERNAL_STORAGE is granted before scanning.
+
+3.2. Scanning Logic
+
+```kotlin
+// utils/LibraryScanner.kt
+class LibraryScanner(
+    private val context: Context,
+    private val dao: LocalSongDao
+) {
+    suspend fun scanAndUpdate(onProgress: (Int, Int) -> Unit = { _, _ -> }) {
+        withContext(Dispatchers.IO) {
+            val downloadDir = File(getDownloadDirectoryPath())
+            val audioFiles = mutableListOf<File>()
+
+            // Recursively find audio files
+            downloadDir.walkTopDown().forEach { file ->
+                if (file.isFile && isAudioFile(file.extension)) {
+                    audioFiles.add(file)
+                }
+            }
+
+            val total = audioFiles.size
+            var processed = 0
+
+            val songs = audioFiles.mapNotNull { file ->
+                val metadata = extractMetadata(file)
+                processed++
+                withContext(Dispatchers.Main) { onProgress(processed, total) }
+                metadata?.let { createLocalSong(file, it) }
+            }
+
+            // Insert all scanned songs (replaces existing ones)
+            dao.insertAll(songs)
+
+            // Delete songs that no longer exist
+            val existingPaths = songs.map { it.filePath }
+            dao.deleteMissing(existingPaths)
+        }
+    }
+
+    private fun isAudioFile(extension: String): Boolean {
+        val lowerExt = extension.lowercase()
+        return lowerExt in setOf("mp3", "m4a", "flac", "wav", "ogg", "aac")
+    }
+
+    private fun extractMetadata(file: File): MediaMetadata? {
+        return try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(file.absolutePath)
+            MediaMetadata(
+                title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    ?: file.nameWithoutExtension,
+                artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist",
+                album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: "Unknown Album",
+                duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        } finally {
+            retriever.release()
+        }
+    }
+
+    private fun createLocalSong(file: File, metadata: MediaMetadata): LocalSong {
+        return LocalSong(
+            filePath = file.absolutePath,
+            title = metadata.title,
+            artist = metadata.artist,
+            album = metadata.album,
+            duration = metadata.duration,
+            size = file.length(),
+            dateModified = file.lastModified()
+        )
+    }
+
+    private fun getDownloadDirectoryPath(): String {
+        // Retrieve from SharedPreferences (default: /storage/emulated/0/Download/Spotify Downloads/)
+        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("download_location", Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/Spotify Downloads") ?: ""
+    }
+
+    private data class MediaMetadata(
+        val title: String,
+        val artist: String,
+        val album: String,
+        val duration: Long
+    )
+}
+```
+
+---
+
+🖥️ 4. LibraryScreen UI
+
+4.1. LibraryViewModel
+
+```kotlin
+// ui/viewmodel/LibraryViewModel.kt
+class LibraryViewModel(
+    private val dao: LocalSongDao,
+    private val scanner: LibraryScanner
+) : ViewModel() {
+
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    private val _scanProgress = MutableStateFlow(Pair(0, 0))
+    val scanProgress: StateFlow<Pair<Int, Int>> = _scanProgress.asStateFlow()
+
+    val allSongs: StateFlow<List<LocalSong>> = dao.getAllSongs()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val songCount: StateFlow<Int> = dao.getSongCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val totalDuration: StateFlow<Long> = dao.getTotalDuration()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val totalSize: StateFlow<Long> = dao.getTotalSize()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    private val _sortOrder = MutableStateFlow(SortOrder.TITLE_ASC)
+    val sortedSongs: StateFlow<List<LocalSong>> = combine(allSongs, _sortOrder) { songs, order ->
+        when (order) {
+            SortOrder.TITLE_ASC -> songs.sortedBy { it.title }
+            SortOrder.TITLE_DESC -> songs.sortedByDescending { it.title }
+            SortOrder.ARTIST_ASC -> songs.sortedBy { it.artist }
+            SortOrder.ARTIST_DESC -> songs.sortedByDescending { it.artist }
+            SortOrder.DURATION_DESC -> songs.sortedByDescending { it.duration }
+            SortOrder.RECENTLY_ADDED -> songs.sortedByDescending { it.dateModified }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun refreshLibrary() {
+        viewModelScope.launch {
+            _isScanning.value = true
+            scanner.scanAndUpdate { processed, total ->
+                _scanProgress.value = Pair(processed, total)
+            }
+            _isScanning.value = false
+        }
+    }
+
+    fun updateSortOrder(order: SortOrder) {
+        _sortOrder.value = order
+    }
+
+    fun toggleFavorite(song: LocalSong) {
+        viewModelScope.launch {
+            val updated = song.copy(isFavorite = !song.isFavorite)
+            dao.update(updated)
+        }
+    }
+
+    fun deleteSong(song: LocalSong) {
+        viewModelScope.launch {
+            val file = File(song.filePath)
+            if (file.exists()) file.delete()
+            dao.delete(song)
+        }
+    }
+
+    enum class SortOrder {
+        TITLE_ASC, TITLE_DESC, ARTIST_ASC, ARTIST_DESC, DURATION_DESC, RECENTLY_ADDED
+    }
+}
+```
+
+4.2. LibraryScreen Composable
+
+We'll build a rich UI with:
+
+· Animated header with stats cards.
+· Shimmer effect during scanning.
+· LazyColumn with smooth item animations.
+· Floating action button to trigger manual scan.
+
+```kotlin
+// ui/screen/LibraryScreen.kt
+@Composable
+fun LibraryScreen(
+    viewModel: LibraryViewModel = hiltViewModel(),
+    onPlaySong: (LocalSong) -> Unit,    // passed from MainActivity to start playback
+    playerState: PlayerState?            // from HomeScreenViewModel to show floating player
+) {
+    val isScanning by viewModel.isScanning.collectAsState()
+    val scanProgress by viewModel.scanProgress.collectAsState()
+    val songs by viewModel.sortedSongs.collectAsState()
+    val songCount by viewModel.songCount.collectAsState()
+    val totalDuration by viewModel.totalDuration.collectAsState()
+    val totalSize by viewModel.totalSize.collectAsState()
+
+    val sortOrder by viewModel.sortOrder.collectAsState() // if exposed
+
+    var showSortDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            LibraryTopBar(
+                songCount = songCount,
+                totalDuration = totalDuration,
+                totalSize = totalSize,
+                onSortClick = { showSortDialog = true },
+                onRefresh = { viewModel.refreshLibrary() }
+            )
+        },
+        floatingActionButton = {
+            if (!isScanning) {
+                FloatingActionButton(
+                    onClick = { viewModel.refreshLibrary() },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        }
+    ) { paddingValues ->
+        Box(modifier = Modifier.padding(paddingValues)) {
+            if (isScanning && songs.isEmpty()) {
+                // Full-screen shimmer loading
+                ShimmerLibraryList()
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = if (playerState != null) 80.dp else 16.dp)
+                ) {
+                    itemsIndexed(
+                        items = songs,
+                        key = { _, song -> song.filePath }
+                    ) { index, song ->
+                        AnimatedSongItem(
+                            song = song,
+                            onPlay = { onPlaySong(song) },
+                            onToggleFavorite = { viewModel.toggleFavorite(song) },
+                            onDelete = { viewModel.deleteSong(song) },
+                            modifier = Modifier.animateItemPlacement()
+                        )
+                        if (index < songs.lastIndex) Divider()
+                    }
+                }
+            }
+
+            // Scanning progress overlay
+            if (isScanning) {
+                LinearProgressIndicator(
+                    progress = if (scanProgress.second > 0) scanProgress.first.toFloat() / scanProgress.second else 0f,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                )
+            }
+        }
+    }
+
+    // Sort dialog
+    if (showSortDialog) {
+        SortOrderDialog(
+            currentOrder = sortOrder,
+            onOrderSelected = {
+                viewModel.updateSortOrder(it)
+                showSortDialog = false
+            },
+            onDismiss = { showSortDialog = false }
+        )
+    }
+}
+
+@Composable
+fun LibraryTopBar(
+    songCount: Int,
+    totalDuration: Long,
+    totalSize: Long,
+    onSortClick: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Library",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Row {
+                IconButton(onClick = onSortClick) {
+                    Icon(Icons.Default.Sort, contentDescription = "Sort")
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatChip(
+                icon = Icons.Default.MusicNote,
+                label = "$songCount songs"
+            )
+            StatChip(
+                icon = Icons.Default.Schedule,
+                label = formatDuration(totalDuration)
+            )
+            StatChip(
+                icon = Icons.Default.Storage,
+                label = formatFileSize(totalSize)
+            )
+        }
+    }
+}
+
+@Composable
+fun AnimatedSongItem(
+    song: LocalSong,
+    onPlay: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    SwipeToDismiss(
+        state = rememberDismissState(
+            confirmValueChange = { dismissValue ->
+                if (dismissValue == DismissValue.DismissedToEnd) {
+                    onPlay()
+                } else if (dismissValue == DismissValue.DismissedToStart) {
+                    showDeleteConfirm = true
+                }
+                false // We don't want automatic dismissal
+            }
+        ),
+        background = {
+            val color = when (dismissState.dismissDirection) {
+                DismissDirection.StartToEnd -> Color(0xFF4CAF50)
+                DismissDirection.EndToStart -> Color(0xFFF44336)
+                null -> Color.Transparent
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(color)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = when (dismissState.dismissDirection) {
+                    DismissDirection.StartToEnd -> Alignment.CenterStart
+                    DismissDirection.EndToStart -> Alignment.CenterEnd
+                    null -> Alignment.Center
+                }
+            ) {
+                Icon(
+                    imageVector = when (dismissState.dismissDirection) {
+                        DismissDirection.StartToEnd -> Icons.Default.PlayArrow
+                        DismissDirection.EndToStart -> Icons.Default.Delete
+                        null -> Icons.Default.PlayArrow
+                    },
+                    contentDescription = null,
+                    tint = Color.White
+                )
+            }
+        },
+        dismissContent = {
+            ListItem(
+                headlineContent = { Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                supportingContent = { Text("${song.artist} • ${song.album}") },
+                leadingContent = {
+                    // Cover art image (could be loaded with Coil/Glide)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        if (song.coverArtPath != null) {
+                            Image(
+                                painter = rememberImagePainter(File(song.coverArtPath)),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                contentDescription = null,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                    }
+                },
+                trailingContent = {
+                    Row {
+                        IconButton(onClick = onToggleFavorite) {
+                            Icon(
+                                if (song.isFavorite) Icons.Filled.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Favorite",
+                                tint = if (song.isFavorite) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = formatDuration(song.duration),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                    }
+                },
+                modifier = modifier
+                    .fillMaxWidth()
+                    .clickable { onPlay() }
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+    )
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Song") },
+            text = { Text("Are you sure you want to delete '${song.title}'?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete()
+                    showDeleteConfirm = false
+                }) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+// Shimmer placeholder
+@Composable
+fun ShimmerLibraryList() {
+    LazyColumn {
+        items(10) {
+            ShimmerSongItem()
+        }
+    }
+}
+
+@Composable
+fun ShimmerSongItem() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .shimmerEffect()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.Gray)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(20.dp)
+                    .background(Color.Gray)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.5f)
+                    .height(16.dp)
+                    .background(Color.Gray)
+            )
+        }
+    }
+}
+```
+
+---
+
+🔌 5. Integration with Existing Music Player
+
+The app already has HomeScreenViewModel that exposes playSong(song: DownloadedSong) and communicates with MusicPlayerService. We need to adapt it to also accept LocalSong.
+
+5.1. Modify MusicPlayerService to Accept LocalSong
+
+```kotlin
+// service/MusicPlayerService.kt
+fun playLocalSong(song: LocalSong) {
+    currentSong = MediaMetadataCompat.Builder()
+        .putString(MediaMetadataCompat.METADATA_KEY_TITLE, song.title)
+        .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, song.artist)
+        .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, song.album)
+        .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, song.duration)
+        // For album art, you can load from file if exists
+        .build()
+    prepareAndPlay(song.filePath)
+}
+```
+
+5.2. Extend HomeScreenViewModel
+
+Add a method to play a LocalSong:
+
+```kotlin
+fun playLocalSong(song: LocalSong) {
+    viewModelScope.launch {
+        musicPlayerService?.playLocalSong(song)
+        _playerState.value = PlayerState(
+            isPlaying = true,
+            currentSong = song.toMediaMetadata(),
+            ...
+        )
+    }
+}
+```
+
+5.3. Connect from MainActivity
+
+In MainActivity, pass the onPlaySong callback to LibraryScreen:
+
+```kotlin
+Scaffold(
+    bottomBar = { BottomBar(navController) }
+) { padding ->
+    NavHost(...) {
+        composable("library") {
+            LibraryScreen(
+                viewModel = libraryViewModel,
+                onPlaySong = { song -> homeViewModel.playLocalSong(song) },
+                playerState = homeViewModel.playerState.value
+            )
+        }
+    }
+}
+```
+
+---
+
+📌 6. Bottom Navigation Update
+
+Update BottomBar.kt to include the new destination:
+
+```kotlin
+sealed class Screen(val route: String, val icon: ImageVector, val label: String) {
+    object Home : Screen("home", Icons.Default.Home, "Home")
+    object Library : Screen("library", Icons.Default.LibraryMusic, "Library")
+    object History : Screen("history", Icons.Default.History, "History")
+    object Settings : Screen("settings", Icons.Default.Settings, "Settings")
+}
+
+@Composable
+fun BottomBar(navController: NavHostController) {
+    val items = listOf(Screen.Home, Screen.Library, Screen.History, Screen.Settings)
+    NavigationBar {
+        items.forEach { screen ->
+            NavigationBarItem(
+                icon = { Icon(screen.icon, contentDescription = null) },
+                label = { Text(screen.label) },
+                selected = navController.currentDestination?.route == screen.route,
+                onClick = {
+                    navController.navigate(screen.route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
+        }
+    }
+}
+```
+
+---
+
+🎨 7. Advanced Animations & Polish
+
+· Item animations: Use Modifier.animateItemPlacement() in LazyColumn for smooth insert/delete/move.
+· Shimmer loading: Implement a shimmer brush with rememberInfiniteTransition for a modern loading effect.
+· Floating player transition: Animate the floating player when appearing/disappearing using AnimatedVisibility.
+· Cover art transitions: Use Crossfade for images.
+
+Example shimmer modifier:
+
+```kotlin
+fun Modifier.shimmerEffect(): Modifier = composed {
+    val transition = rememberInfiniteTransition()
+    val alpha by transition.animateFloat(
+        initialValue = 0.2f, targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse)
+    )
+    background(Color.LightGray.copy(alpha = alpha))
+}
+```
+
+---
+
+🧪 8. Testing & Performance
+
+· Large libraries: Use Paging 3 if the user has thousands of songs. The current LazyColumn with Room Flow is fine for up to ~500 items.
+· Background scanning: Already done with coroutines; add a WorkManager periodic scan to keep library updated automatically.
+· Cover art extraction: For performance, extract cover art only when needed or cache thumbnails.
+
+---
+
+🚀 9. Extra Features You Can Add
+
+· Playlist creation: Allow users to group local songs into custom playlists stored in Room.
+· Recently played: Keep a list of last 20 played songs for quick access.
+· Equalizer: Integrate with Android's AudioEffect for a built‑in equalizer.
+· Lyrics display: Fetch synced lyrics from LRCLIB or embedded tags.
+· Folder browser: Let users add additional folders to scan beyond the default download directory.
+
+---
+
+📝 Summary of Changes
+
+Component What's New
+Database Room with LocalSong entity and DAO
+Scanner LibraryScanner class to walk directories and extract metadata
+UI New LibraryScreen with stats, shimmer, swipe actions, and animations
+Navigation Updated BottomBar with "Library" tab
+ViewModel LibraryViewModel managing scan state, sorting, and favorites
+Player Integration MusicPlayerService extended to play LocalSong
+
+The result is a fully integrated local music library that feels native to the app, with the same sleek Material 3 design and smooth playback experience users already enjoy.
