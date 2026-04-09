@@ -908,6 +908,10 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 withContext(Dispatchers.Main) {
                     mediaPlayer?.release()
                     mediaPlayer = android.media.MediaPlayer().apply {
+                        setAudioAttributes(android.media.AudioAttributes.Builder()
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                            .build())
                         setDataSource(fileMeta.url)
                         setVolume(volume, volume)
                         setOnPreparedListener { mp ->
@@ -931,6 +935,24 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                                     this@HomeScreenViewModel.updateMusicNotification()
                                 }
                             }
+                        }
+                        setOnErrorListener { mp, what, extra ->
+                            val errorMsg = when (what) {
+                                android.media.MediaPlayer.MEDIA_ERROR_UNKNOWN -> "Unknown playback error"
+                                android.media.MediaPlayer.MEDIA_ERROR_SERVER_DIED -> "Audio system error"
+                                else -> "Playback failed (error $what)"
+                            }
+                            android.util.Log.e("MusicPlayer", "MediaPlayer error: $errorMsg (extra: $extra) for URL: ${fileMeta.url}")
+                            Toast.makeText(getApplication(), "Cannot play ${trackName}: $errorMsg", Toast.LENGTH_SHORT).show()
+                            this@HomeScreenViewModel.isPlayerLoading = false
+                            this@HomeScreenViewModel.isPlaying = false
+                            try {
+                                mp.reset()
+                                mp.release()
+                            } catch (e: Exception) {
+                                android.util.Log.e("MusicPlayer", "Error releasing MediaPlayer", e)
+                            }
+                            true
                         }
                         prepareAsync()
                     }
