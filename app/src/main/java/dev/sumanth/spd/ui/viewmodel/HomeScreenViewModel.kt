@@ -855,10 +855,16 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     private fun startPlaybackProgressUpdater() {
         playbackJob?.cancel()
         playbackJob = viewModelScope.launch {
+            var lastWidgetUpdate = 0L
             while (mediaPlayer != null && isPlaying) {
                 mediaPlayer?.let { mp ->
                     currentTime = mp.currentPosition / 1000f
                     duration = if (mp.duration > 0) mp.duration / 1000f else duration
+                }
+                val now = System.currentTimeMillis()
+                if (now - lastWidgetUpdate >= 1000L) {
+                    updateMusicNotification()
+                    lastWidgetUpdate = now
                 }
                 kotlinx.coroutines.delay(500)
             }
