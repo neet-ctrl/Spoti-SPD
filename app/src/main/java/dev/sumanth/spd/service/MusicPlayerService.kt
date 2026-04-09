@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
@@ -123,7 +124,7 @@ class MusicPlayerService : Service() {
     private var mediaSession: MediaSessionCompat? = null
     private val localPlaybackList = mutableListOf<LocalPlaybackSong>()
     private var currentLocalIndex = -1
-    private var localMediaPlayer: android.media.MediaPlayer? = null
+    private var localMediaPlayer: MediaPlayer? = null
     private var isLocalLoading = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -222,7 +223,7 @@ class MusicPlayerService : Service() {
         saveWidgetPlaybackState(song.title, song.artist, false, true, 0f, 0f)
 
         try {
-            localMediaPlayer = android.media.MediaPlayer().apply {
+            localMediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
                     android.media.AudioAttributes.Builder()
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -230,18 +231,18 @@ class MusicPlayerService : Service() {
                         .build()
                 )
                 setDataSource(song.filePath)
-                setOnPrepared { player: android.media.MediaPlayer ->
+                setOnPrepared { player: MediaPlayer ->
                     isLocalLoading = false
                     player.start()
                     val durationSeconds = (player.duration / 1000f).coerceAtLeast(0f)
                     updateServiceNotification(true, 0f, durationSeconds, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, true, false, 0f, durationSeconds)
                 }
-                setOnCompletion { player: android.media.MediaPlayer ->
+                setOnCompletion { player: MediaPlayer ->
                     updateServiceNotification(false, getCurrentPlaybackPosition(), getCurrentDuration(), false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, getCurrentPlaybackPosition(), getCurrentDuration())
                 }
-                setOnError { mp: android.media.MediaPlayer, what: Int, extra: Int ->
+                setOnError { mp: MediaPlayer, what: Int, extra: Int ->
                     updateServiceNotification(false, 0f, 0f, false, song.title, song.artist)
                     saveWidgetPlaybackState(song.title, song.artist, false, false, 0f, 0f)
                     false
