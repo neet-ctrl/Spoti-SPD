@@ -809,6 +809,10 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                     mediaPlayer?.release()
                     mediaPlayer = android.media.MediaPlayer().apply {
                         try {
+                            setAudioAttributes(android.media.AudioAttributes.Builder()
+                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                .build())
                             setDataSource(item.filePath)
                             setVolume(volume, volume)
                             setOnPreparedListener { mp ->
@@ -833,15 +837,20 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                             setOnErrorListener { mp, what, extra ->
                                 // Log the error and show user-friendly message
                                 val errorMsg = when (what) {
-                                    android.media.MediaPlayer.MEDIA_ERROR_UNKNOWN -> "Unknown media error"
-                                    android.media.MediaPlayer.MEDIA_ERROR_SERVER_DIED -> "Media server died"
-                                    else -> "Media error: $what"
+                                    android.media.MediaPlayer.MEDIA_ERROR_UNKNOWN -> "Unknown playback error"
+                                    android.media.MediaPlayer.MEDIA_ERROR_SERVER_DIED -> "Audio system error"
+                                    else -> "Playback failed (error $what)"
                                 }
                                 android.util.Log.e("MusicPlayer", "MediaPlayer error: $errorMsg (extra: $extra) for file: ${item.filePath}")
-                                Toast.makeText(getApplication(), "Cannot play ${item.title}: $errorMsg", Toast.LENGTH_LONG).show()
+                                Toast.makeText(getApplication(), "Cannot play ${item.title}: $errorMsg", Toast.LENGTH_SHORT).show()
                                 this@HomeScreenViewModel.isPlayerLoading = false
                                 this@HomeScreenViewModel.isPlaying = false
-                                mp.release()
+                                try {
+                                    mp.reset()
+                                    mp.release()
+                                } catch (e: Exception) {
+                                    android.util.Log.e("MusicPlayer", "Error releasing MediaPlayer", e)
+                                }
                                 true // Return true to indicate we handled the error
                             }
                             prepareAsync()
