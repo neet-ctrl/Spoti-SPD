@@ -157,6 +157,7 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_volume_down, buildControlIntent(context, MusicPlayerService.ACTION_VOLUME_DOWN))
                 setOnClickPendingIntent(R.id.widget_refresh, buildRefreshIntent(context))
                 setOnClickPendingIntent(R.id.widget_root, buildOpenLibraryIntent(context, false))
+                setOnClickPendingIntent(R.id.widget_copy_log, buildCopyLogIntent(context))
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
@@ -169,6 +170,16 @@ class MusicPlayerWidgetProvider : AppWidgetProvider() {
             }
             return PendingIntent.getBroadcast(
                 context, 0, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+        private fun buildCopyLogIntent(context: Context): PendingIntent {
+            val intent = Intent(context, WidgetCopyLogReceiver::class.java).apply {
+                action = WidgetCopyLogReceiver.ACTION_COPY_LOG
+            }
+            return PendingIntent.getBroadcast(
+                context, 2, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         }
