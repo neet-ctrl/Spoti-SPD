@@ -22,6 +22,7 @@ import dev.sumanth.spd.model.LocalPlaybackItem
 import dev.sumanth.spd.model.Track
 import dev.sumanth.spd.service.MusicPlayerService
 import dev.sumanth.spd.service.MusicPlayerWidgetProvider
+import dev.sumanth.spd.service.WidgetSongListFactory
 import dev.sumanth.spd.utils.DownloadHistoryManager
 import dev.sumanth.spd.utils.DownloadManager
 import dev.sumanth.spd.utils.SharedPref
@@ -78,6 +79,10 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
     var playerOffsetX by mutableFloatStateOf(0f)
     var playerOffsetY by mutableFloatStateOf(0f)
     var isFavorite by mutableStateOf(false)
+    var playbackSpeed by mutableFloatStateOf(1f)
+        private set
+    private val speedCycle = floatArrayOf(1f, 1.25f, 1.5f, 2f, 0.75f)
+    private var speedCycleIndex = 0
 
     var isLocalPlayback by mutableStateOf(false)
         private set
@@ -110,6 +115,14 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
                 MusicPlayerService.ACTION_SEEK_BACKWARD -> seekBy(-10f)
                 MusicPlayerService.ACTION_SEEK_FORWARD -> seekBy(10f)
                 MusicPlayerService.ACTION_CLOSE -> closePlayer()
+                MusicPlayerService.ACTION_PLAY_SONG_INDEX -> {
+                    val idx = intent?.getIntExtra(MusicPlayerService.EXTRA_SONG_INDEX, -1) ?: -1
+                    if (idx >= 0) playLocalSongFromWidget(idx)
+                }
+                MusicPlayerService.ACTION_SPEED_CHANGE -> cyclePlaybackSpeed()
+                MusicPlayerService.ACTION_VOLUME_UP -> adjustVolume(0.1f)
+                MusicPlayerService.ACTION_VOLUME_DOWN -> adjustVolume(-0.1f)
+                MusicPlayerService.ACTION_EQUALIZER -> openEqualizerIntent()
             }
         }
     }
@@ -130,12 +143,40 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             addAction(MusicPlayerService.ACTION_SEEK_BACKWARD)
             addAction(MusicPlayerService.ACTION_SEEK_FORWARD)
             addAction(MusicPlayerService.ACTION_CLOSE)
+            addAction(MusicPlayerService.ACTION_PLAY_SONG_INDEX)
+            addAction(MusicPlayerService.ACTION_SPEED_CHANGE)
+            addAction(MusicPlayerService.ACTION_VOLUME_UP)
+            addAction(MusicPlayerService.ACTION_VOLUME_DOWN)
+            addAction(MusicPlayerService.ACTION_EQUALIZER)
         }
         LocalBroadcastManager.getInstance(getApplication()).registerReceiver(notificationActionReceiver, filter)
     }
 
+    private fun playLocalSongFromWidget(index: Int) {
+        val prefs = getApplication<Application>().getSharedPreferences(
+            WidgetSongListFactory.PREFS_NAME, Context.MODE_PRIVATE
+        )
+        val jsonStr = prefs.getString(WidgetSongListFactory.KEY_SONGS_JSON, null) ?: return
+        try {
+            val arr = org.json.JSONArray(jsonStr)
+            val songs = (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                LocalPlaybackItem(
+                    title = obj.optString("title", "Unknown"),
+                    artist = obj.optString("artist", ""),
+                    filePath = obj.optString("filePath", "")
+                )
+            }.filter { it.filePath.isNotBlank() }
+            if (index in songs.indices) {
+                playLocalPlaylist(songs, index)
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun updateMusicNotification() {
         val song = getCurrentSong() ?: return
+        val songPos = if (isLocalPlayback) currentLocalIndex else -1
+        val songTotal = if (isLocalPlayback) localPlaybackList.size else 0
         val intent = MusicPlayerService.buildUpdateIntent(
             getApplication(),
             song.title,
@@ -146,7 +187,11 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             isPlayerLoading,
             isShuffleMode,
             repeatMode.ordinal,
-            isFavorite
+            isFavorite,
+            speed = playbackSpeed,
+            volume = _volume,
+            songPosition = songPos,
+            songTotal = songTotal
         )
         getApplication<Application>().startService(intent)
         persistPlayerWidgetState(song.title, song.artist)
@@ -155,6 +200,8 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
 
     private fun persistPlayerWidgetState(title: String, artist: String) {
         val prefs = getApplication<Application>().getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
+        val songPos = if (isLocalPlayback) currentLocalIndex else -1
+        val songTotal = if (isLocalPlayback) localPlaybackList.size else 0
         prefs.edit()
             .putString("title", title)
             .putString("artist", artist)
@@ -165,7 +212,48 @@ class HomeScreenViewModel(application: Application) : AndroidViewModel(applicati
             .putBoolean("is_shuffle", isShuffleMode)
             .putInt("repeat_mode", repeatMode.ordinal)
             .putBoolean("is_favorite", isFavorite)
+            .putFloat("speed", playbackSpeed)
+            .putFloat("volume", _volume)
+            .putInt("song_position", songPos)
+            .putInt("song_total", songTotal)
             .apply()
+        val songIndex = if (isLocalPlayback) currentLocalIndex else -1
+        WidgetSongListFactory.saveCurrentIndex(getApplication(), songIndex)
+    }
+
+    private fun cyclePlaybackSpeed() {
+        speedCycleIndex = (speedCycleIndex + 1) % speedCycle.size
+        playbackSpeed = speedCycle[speedCycleIndex]
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                mediaPlayer?.playbackParams = mediaPlayer?.playbackParams?.setSpeed(playbackSpeed)
+                    ?: android.media.PlaybackParams().setSpeed(playbackSpeed)
+            }
+        } catch (_: Exception) {}
+        updateMusicNotification()
+    }
+
+    private fun adjustVolume(delta: Float) {
+        _volume = (_volume + delta).coerceIn(0f, 1f)
+        try {
+            mediaPlayer?.setVolume(_volume, _volume)
+        } catch (_: Exception) {}
+        updateMusicNotification()
+    }
+
+    private fun openEqualizerIntent() {
+        try {
+            val sessionId = mediaPlayer?.audioSessionId ?: 0
+            val eqIntent = Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+                putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, sessionId)
+                putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE,
+                    android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (eqIntent.resolveActivity(getApplication<Application>().packageManager) != null) {
+                getApplication<Application>().startActivity(eqIntent)
+            }
+        } catch (_: Exception) {}
     }
 
     private fun stopMusicService() {

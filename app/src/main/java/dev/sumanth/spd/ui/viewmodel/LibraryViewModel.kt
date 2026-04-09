@@ -7,9 +7,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sumanth.spd.model.LocalSong
 import dev.sumanth.spd.service.MusicPlayerWidgetProvider
+import dev.sumanth.spd.service.WidgetSongListFactory
 import dev.sumanth.spd.utils.LibraryScanner
 import dev.sumanth.spd.utils.SharedPref
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -144,6 +147,26 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             .putString(KEY_SCAN_PATH, scanPath.value)
             .putBoolean(KEY_IS_SCANNING, isScanning)
             .apply()
+
+        val playerPrefs = getApplication<Application>().getSharedPreferences("player_widget_prefs", Context.MODE_PRIVATE)
+        playerPrefs.edit().putInt("song_count", _songs.value.size).apply()
+
+        if (!isScanning) {
+            saveSongsForWidget()
+        }
+    }
+
+    private fun saveSongsForWidget() {
+        val arr = JSONArray()
+        _songs.value.forEachIndexed { _, song ->
+            arr.put(JSONObject().apply {
+                put("title", song.title)
+                put("artist", song.artist)
+                put("filePath", song.filePath)
+                put("duration", song.duration)
+            })
+        }
+        WidgetSongListFactory.saveSongsToPrefs(getApplication(), arr.toString())
     }
 
     fun setSortOrder(order: LibrarySortOrder) {
