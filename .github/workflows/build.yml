@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
 
-# ✅ CRITICAL (fixes 403 permanently)
+# ✅ Fix 403 permanently
 permissions:
   contents: write
 
@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ✅ Java setup (faster + stable)
+      # ✅ Java setup
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
@@ -25,7 +25,7 @@ jobs:
           java-version: 17
           cache: gradle
 
-      # ✅ Create secrets.xml safely
+      # ✅ Inject API Keys safely
       - name: Inject API Keys
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
@@ -55,7 +55,7 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
-      # ✅ Get APK info safely
+      # ✅ Get APK info
       - name: Get APK info
         id: apk-info
         run: |
@@ -72,9 +72,11 @@ jobs:
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
           echo "apk_size=${APK_SIZE_MB} MB" >> $GITHUB_OUTPUT
 
-      # ✅ Generate release notes (safe version fallback)
+      # ✅ Generate release notes (FIXED YAML ERROR)
       - name: Generate release notes
         id: release-notes
+        env:
+          APK_SIZE: ${{ steps.apk-info.outputs.apk_size }}
         run: |
           DATE=$(date +'%B %d, %Y')
 
@@ -93,7 +95,7 @@ jobs:
 ### 📦 Package Details
 - Version: $VERSION
 - Build: Debug
-- Size: ${{ steps.apk-info.outputs.apk_size }}
+- Size: $APK_SIZE
 
 ### ⚠️ Notes
 - This is a debug build
@@ -107,16 +109,16 @@ EOF
           cat notes.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # ✅ FINAL RELEASE (100% safe)
+      # ✅ Create GitHub Release (FINAL FIX)
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.run_id }}-debug   # 🔥 UNIQUE → no 403 ever
+          tag_name: v${{ github.run_id }}-debug   # 🔥 unique → no 403 ever
           name: SPD Debug Build ${{ github.run_number }}
           body: ${{ steps.release-notes.outputs.body }}
           files: ${{ steps.apk-info.outputs.apk_path }}
           draft: false
           prerelease: true
-          fail_on_unmatched_files: false   # ✅ prevents crash
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
