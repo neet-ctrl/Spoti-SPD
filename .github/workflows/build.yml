@@ -1,124 +1,115 @@
 name: Build and Release
-
 on:
   push:
     branches:
-      - main
+      - 'main'
   workflow_dispatch:
-
-# ✅ Fix 403 permanently
-permissions:
-  contents: write
 
 jobs:
   Build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      # ✅ Java setup
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
-          cache: gradle
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
 
-      # ✅ Inject API Keys safely
-      - name: Inject API Keys
+      - name: Access Api keys
         env:
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          clientId: ${{ secrets.CLIENT_ID }}
+          clientSecret: ${{ secrets.CLIENT_SECRET }}
+          path: app/src/main/res/values/secrets.xml
         run: |
-          mkdir -p app/src/main/res/values
-          cat <<EOF > app/src/main/res/values/secrets.xml
-          <resources>
-              <string name="CLIENT_ID">${CLIENT_ID}</string>
-              <string name="CLIENT_SECRET">${CLIENT_SECRET}</string>
-          </resources>
-          EOF
+          touch $path
+          echo \<resources\> >> $path
+          echo \<string name=\"CLIENT_ID\"\>$clientId\</string\> >> $path
+          echo \<string name=\"CLIENT_SECRET\"\>$clientSecret\</string\> >> $path
+          echo \</resources\> >> $path
 
-      # ✅ Gradle permission
-      - name: Grant execute permission
-        run: chmod +x ./gradlew
-
-      # ✅ Build APK
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        id: build
+        run: bash ./gradlew assembleDebug
 
-      # ✅ Upload artifact (backup)
       - name: Upload Debug APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apk
+          name: spotify-playlist-downloader-debug
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
-      # ✅ Get APK info
       - name: Get APK info
         id: apk-info
         run: |
           APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
-
-          if [ -z "$APK_PATH" ]; then
-            echo "❌ APK not found!"
-            exit 1
-          fi
-
           APK_SIZE=$(stat -c%s "$APK_PATH")
           APK_SIZE_MB=$(echo "scale=2; $APK_SIZE / 1048576" | bc)
-
           echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-          echo "apk_size=${APK_SIZE_MB} MB" >> $GITHUB_OUTPUT
+          echo "apk_size=$APK_SIZE_MB MB" >> $GITHUB_OUTPUT
 
-      # ✅ Generate release notes (FIXED YAML ERROR)
       - name: Generate release notes
         id: release-notes
-        env:
-          APK_SIZE: ${{ steps.apk-info.outputs.apk_size }}
         run: |
+          # Get current date
           DATE=$(date +'%B %d, %Y')
 
-          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts || echo "1.0.0")
+          # Get version from build.gradle.kts
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
 
-          cat <<EOF > notes.txt
-## 🎵 SPD - Spotify Playlist Downloader v$VERSION
+          # Create release body
+          RELEASE_BODY="## 🎵 SPD - Spotify Playlist Downloader v$VERSION
 
-**Release Date:** $DATE
+          **Release Date:** $DATE
 
-### 📱 What's New
-- Automated debug build
-- Latest features included
-- Improved stability
+          ### 📱 What's New
+          - Latest development build
+          - Includes all recent features and improvements
+          - Debug build for testing purposes
 
-### 📦 Package Details
-- Version: $VERSION
-- Build: Debug
-- Size: $APK_SIZE
+          ### 📦 Package Details
+          - **Version:** $VERSION
+          - **Build Type:** Debug
+          - **File Size:** ${{ steps.apk-info.outputs.apk_size }}
+          - **Platform:** Android 7.0+
 
-### ⚠️ Notes
-- This is a debug build
-- Enable unknown sources before install
+          ### 🚀 Features
+          - Download Spotify playlists, albums, and tracks
+          - Built-in music player with full controls
+          - Batch downloads and ZIP archives
+          - Material 3 design with dark/light themes
+          - MP3 conversion support
 
----
-Developed by Shakti Kumar
-EOF
+          ### ⚠️ Important Notes
+          - This is a debug build intended for testing
+          - Enable \"Install from Unknown Sources\" on your device
+          - Grant storage permissions when prompted
+
+          ### 📥 Installation
+          1. Download the APK file below
+          2. Enable installation from unknown sources
+          3. Install and enjoy!
+
+          ---
+          **Developed by:** Shakti Kumar
+          **Repository:** [GitHub](https://github.com/Shakti-ctrl/spoti)"
 
           echo "body<<EOF" >> $GITHUB_OUTPUT
-          cat notes.txt >> $GITHUB_OUTPUT
+          echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # ✅ Create GitHub Release (FINAL FIX)
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.run_id }}-debug   # 🔥 unique → no 403 ever
+          tag_name: v${{ github.run_number }}-debug
           name: SPD Debug Build ${{ github.run_number }}
           body: ${{ steps.release-notes.outputs.body }}
-          files: ${{ steps.apk-info.outputs.apk_path }}
+          files: |
+            ${{ steps.apk-info.outputs.apk_path }}
           draft: false
           prerelease: true
-          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
